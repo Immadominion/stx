@@ -1,0 +1,13 @@
+[package]
+name = "stx-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Domain model for the stx transaction control tower: event-sourced lifecycle FSM, commitment ladder, failure taxonomy, span/trace model, and AI decision records."
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+uuid.workspace = true

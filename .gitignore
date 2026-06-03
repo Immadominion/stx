@@ -1,0 +1,29 @@
+# Rust
+/target
+**/target
+
+# Node / dashboard
+node_modules/
+.next/
+dist/
+
+# Secrets / environment
+.env
+.env.*
+*.key
+*.pem
+*keypair*.json
+id.json
+wallet*.json
+
+# Local tooling (not part of the product)
+.agents/
+.claude/
+.gemini/
+.vscode/
+context.txt
+
+# OS / editor
+.DS_Store
+*.log
+/docs/diagrams/*.png

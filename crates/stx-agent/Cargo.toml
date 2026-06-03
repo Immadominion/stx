@@ -1,0 +1,19 @@
+[package]
+name = "stx-agent"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "AI reasoning layer: an Anthropic tool-use loop that owns the failure-reasoning/retry decision, a deterministic guardrail validator, and auditable decision records."
+
+[dependencies]
+stx-core = { path = "../stx-core" }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+thiserror.workspace = true
+chrono.workspace = true
+reqwest = { version = "0.12", default-features = false, features = ["json", "gzip", "rustls-tls"] }
+async-trait = "0.1"
+tracing = "0.1"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt"] }

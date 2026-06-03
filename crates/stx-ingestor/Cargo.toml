@@ -1,0 +1,17 @@
+[package]
+name = "stx-ingestor"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Yellowstone gRPC (Geyser) ingestor: slot/leader + transaction streaming with reconnect, replay, and backpressure handling."
+
+[dependencies]
+futures = "0.3.32"
+bs58 = "0.5"
+stx-core = { path = "../stx-core" }
+thiserror.workspace = true
+tokio = { version = "1.52.3", features = ["rt-multi-thread", "macros", "sync", "time"] }
+tonic = "0.14.6"
+tracing = "0.1.44"
+yellowstone-grpc-client = "13.1.0"
+yellowstone-grpc-proto = "12.4.0"
