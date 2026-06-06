@@ -14,7 +14,10 @@ stx-core = { path = "../stx-core" }
 stx-jito = { path = "../stx-jito" }
 stx-agent = { path = "../stx-agent" }
 serde_json.workspace = true
+chrono.workspace = true
 clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "gzip", "rustls-tls"] }
 anyhow = "1"
+dotenvy = "0.15"
+solana-sdk = "4.0.1"

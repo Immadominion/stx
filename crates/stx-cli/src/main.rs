@@ -9,13 +9,18 @@
 //! credentials are wired; the deterministic pieces it composes are already built
 //! and tested in the library crates.
 
+mod config;
+mod engine;
+
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use stx_agent::{
     build_record, validate, AgentConfig, AnthropicClient, FaultScenario, GuardrailPolicy, MockTools,
     ReasoningAgent, ValidationContext,
 };
-use stx_core::{AgentAction, Decision, DecisionParams, Lamports, LogicalTxId, TraceId};
+use stx_core::{
+    spans_for_trace, AgentAction, Decision, DecisionParams, Lamports, LogicalTxId, TraceId,
+};
 use stx_jito::{JitoClient, TipFloorClient};
 
 #[derive(Parser)]
@@ -38,6 +43,22 @@ enum Command {
     FaultInject {
         #[arg(value_enum)]
         scenario: ScenarioArg,
+    },
+    /// Build, submit and track a real Jito bundle. Use --dry-run to build and
+    /// simulate only. Reads RPC from .env.local and the keypair from wallet.json.
+    Submit {
+        /// Build and simulate only; do not submit on-chain.
+        #[arg(long)]
+        dry_run: bool,
+        /// Path to the keypair file.
+        #[arg(long, default_value = "wallet.json")]
+        keypair: String,
+        /// Override the Jito tip account (default: fetched, first of 8).
+        #[arg(long)]
+        tip_account: Option<String>,
+        /// Confirmation timeout in seconds.
+        #[arg(long, default_value_t = 30)]
+        timeout: u64,
     },
 }
 
@@ -140,6 +161,42 @@ async fn main() -> Result<()> {
                 report,
             );
             println!("{}", serde_json::to_string_pretty(&record)?);
+        }
+        Command::Submit {
+            dry_run,
+            keypair,
+            tip_account,
+            timeout,
+        } => {
+            let cfg = config::EngineConfig::load(&keypair)?;
+            eprintln!("payer: {}", cfg.payer_pubkey());
+            let outcome = engine::submit_and_track(
+                &cfg,
+                &http,
+                &engine::SubmitOptions {
+                    dry_run,
+                    tip_account,
+                    confirm_timeout_secs: timeout,
+                },
+            )
+            .await?;
+
+            // Span waterfall (the latency deltas) from the real run.
+            let events = outcome.store.events_for_trace(&outcome.trace_id);
+            let spans = spans_for_trace(&events);
+            if !spans.is_empty() {
+                eprintln!("span waterfall:");
+                for s in &spans {
+                    eprintln!("  {:?}: {} ms", s.name, s.duration_ms().unwrap_or(0));
+                }
+            }
+            eprintln!(
+                "result: landed={} attempts={} sig={:?} slot={:?}",
+                outcome.landed, outcome.attempts, outcome.signature, outcome.slot
+            );
+
+            // The lifecycle log (a bounty deliverable) to stdout as JSON.
+            println!("{}", serde_json::to_string_pretty(outcome.store.events())?);
         }
     }
 
