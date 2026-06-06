@@ -3320,6 +3320,7 @@ name = "stx-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "clap",
  "dotenvy",
@@ -3328,6 +3329,7 @@ dependencies = [
  "solana-sdk",
  "stx-agent",
  "stx-core",
+ "stx-ingestor",
  "stx-jito",
  "tokio",
 ]

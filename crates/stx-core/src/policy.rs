@@ -93,12 +93,28 @@ pub fn fallback_remedy(
                 format!("raise CU limit to {cu}; the tip was not the problem"),
             )
         }
-        FailureKind::BundleFailed | FailureKind::Dropped | FailureKind::SimulationFailure => remedy(
+        // A bundle that never landed with no explicit error almost always lost
+        // the tip auction; escalate the tip to the next percentile bracket.
+        FailureKind::BundleFailed | FailureKind::Dropped => {
+            let tip = next_percentile_above(floor, current_tip);
+            remedy(
+                AgentAction::RaiseTip,
+                tip,
+                Some(current_cu_limit),
+                false,
+                "lost the bundle auction",
+                format!(
+                    "bundle did not land; escalate tip to the next percentile ({} lamports)",
+                    tip.0
+                ),
+            )
+        }
+        FailureKind::SimulationFailure => remedy(
             AgentAction::Resubmit,
             current_tip,
             Some(current_cu_limit),
             false,
-            "transient bundle failure",
+            "transient simulation failure",
             "resubmit unchanged".into(),
         ),
         FailureKind::AdverseMarket | FailureKind::AlreadyProcessed | FailureKind::Unknown => remedy(
@@ -170,5 +186,13 @@ mod tests {
         let class = FailureClass::new(FailureKind::AdverseMarket, "slippage", 0.6);
         let d = fallback_remedy(&class, &floor(), Lamports(30_000), 200_000);
         assert_eq!(d.action, AgentAction::Abort);
+    }
+
+    #[test]
+    fn dropped_escalates_tip() {
+        let class = FailureClass::new(FailureKind::Dropped, "never landed", 0.5);
+        let d = fallback_remedy(&class, &floor(), Lamports(30_000), 200_000);
+        assert_eq!(d.action, AgentAction::RaiseTip);
+        assert_eq!(d.params.tip_lamports, Lamports(91_863)); // next bracket above p50
     }
 }

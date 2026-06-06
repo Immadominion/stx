@@ -13,6 +13,7 @@ path = "src/main.rs"
 stx-core = { path = "../stx-core" }
 stx-jito = { path = "../stx-jito" }
 stx-agent = { path = "../stx-agent" }
+stx-ingestor = { path = "../stx-ingestor" }
 serde_json.workspace = true
 chrono.workspace = true
 clap = { version = "4", features = ["derive"] }
@@ -21,3 +22,4 @@ reqwest = { version = "0.12", default-features = false, features = ["json", "gzi
 anyhow = "1"
 dotenvy = "0.15"
 solana-sdk = "4.0.1"
+async-trait = "0.1"

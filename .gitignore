@@ -23,6 +23,9 @@ wallet*.json
 .vscode/
 context.txt
 
+# Scratch run logs (curated evidence lives under docs/ when ready)
+runs/
+
 # OS / editor
 .DS_Store
 *.log

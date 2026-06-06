@@ -7,6 +7,7 @@
 //! ~13s old and burns the validity window.
 
 use crate::error::JitoError;
+use crate::rpc::parse_commitment;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -74,6 +75,27 @@ pub struct PrioritizationFee {
     pub slot: u64,
     #[serde(rename = "prioritizationFee")]
     pub prioritization_fee: u64,
+}
+
+/// On-chain signature status (authoritative landing check, never a false
+/// negative for a landed tx, unlike Jito's `getInflightBundleStatuses`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct SignatureStatusValue {
+    pub slot: u64,
+    /// `null` on success.
+    #[serde(default)]
+    pub err: Value,
+    #[serde(rename = "confirmationStatus", default)]
+    pub confirmation_status: Option<String>,
+}
+
+impl SignatureStatusValue {
+    pub fn succeeded(&self) -> bool {
+        self.err.is_null()
+    }
+    pub fn commitment(&self) -> Option<Commitment> {
+        self.confirmation_status.as_deref().and_then(parse_commitment)
+    }
 }
 
 /// A thin Solana JSON-RPC client.
@@ -168,6 +190,21 @@ impl SolanaRpc {
         self.call("getRecentPrioritizationFees", json!([accounts]))
             .await
     }
+
+    /// `getSignatureStatuses` - authoritative on-chain landing check. Entries
+    /// are `null` for signatures not found.
+    pub async fn get_signature_statuses(
+        &self,
+        signatures: &[String],
+    ) -> Result<Vec<Option<SignatureStatusValue>>, JitoError> {
+        let cv: Ctx<Vec<Option<SignatureStatusValue>>> = self
+            .call(
+                "getSignatureStatuses",
+                json!([signatures, { "searchTransactionHistory": false }]),
+            )
+            .await?;
+        Ok(cv.value)
+    }
 }
 
 /// Whether a blockhash has expired: the cluster's block height has passed the
@@ -209,6 +246,20 @@ mod tests {
         let v = parsed.result.unwrap();
         assert_eq!(v.len(), 2);
         assert_eq!(v[1].prioritization_fee, 12000);
+    }
+
+    #[test]
+    fn parses_signature_statuses() {
+        let body = r#"{"jsonrpc":"2.0","result":{"context":{"slot":2},"value":[{"slot":424775191,"confirmations":null,"err":null,"confirmationStatus":"confirmed"},null]},"id":1}"#;
+        let parsed: Resp<Ctx<Vec<Option<SignatureStatusValue>>>> =
+            serde_json::from_str(body).unwrap();
+        let v = parsed.result.unwrap().value;
+        assert_eq!(v.len(), 2);
+        let first = v[0].as_ref().unwrap();
+        assert_eq!(first.slot, 424775191);
+        assert!(first.succeeded());
+        assert_eq!(first.commitment(), Some(Commitment::Confirmed));
+        assert!(v[1].is_none());
     }
 
     #[test]

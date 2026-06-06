@@ -27,7 +27,8 @@ pub use rpc::{
     JitoClient, MAINNET_GLOBAL, MAINNET_REGIONS, TESTNET_GLOBAL,
 };
 pub use solrpc::{
-    blockhash_expired, LatestBlockhash, PrioritizationFee, SimulationValue, SolanaRpc,
+    blockhash_expired, LatestBlockhash, PrioritizationFee, SignatureStatusValue, SimulationValue,
+    SolanaRpc,
 };
 pub use tip::{
     parse_tip_floor, recommend_tip, Congestion, TipFloorClient, DEFAULT_TIP_FLOOR_URL,

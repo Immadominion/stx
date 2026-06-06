@@ -9,6 +9,7 @@
 //! credentials are wired; the deterministic pieces it composes are already built
 //! and tested in the library crates.
 
+mod agent_tools;
 mod config;
 mod engine;
 
@@ -44,6 +45,12 @@ enum Command {
         #[arg(value_enum)]
         scenario: ScenarioArg,
     },
+    /// Connect to the Yellowstone gRPC stream and print N slot updates. Verifies
+    /// the gRPC endpoint + x-token (reads SOLINFRA_GRPC_* from .env.local).
+    WatchSlots {
+        #[arg(long, default_value_t = 10)]
+        count: u32,
+    },
     /// Build, submit and track a real Jito bundle. Use --dry-run to build and
     /// simulate only. Reads RPC from .env.local and the keypair from wallet.json.
     Submit {
@@ -59,6 +66,9 @@ enum Command {
         /// Confirmation timeout in seconds.
         #[arg(long, default_value_t = 30)]
         timeout: u64,
+        /// Let the AI agent own the retry decision (needs ANTHROPIC_API_KEY).
+        #[arg(long)]
+        use_agent: bool,
     },
 }
 
@@ -162,11 +172,43 @@ async fn main() -> Result<()> {
             );
             println!("{}", serde_json::to_string_pretty(&record)?);
         }
+        Command::WatchSlots { count } => {
+            let _ = dotenvy::from_filename(".env.local");
+            let endpoint = std::env::var("SOLINFRA_GRPC_ENDPOINT")
+                .map_err(|_| anyhow!("set SOLINFRA_GRPC_ENDPOINT in .env.local"))?;
+            let token = std::env::var("SOLINFRA_GRPC_X_TOKEN")
+                .or_else(|_| std::env::var("SOLINFRA_GRPC_SECRET"))
+                .ok();
+            let cfg = stx_ingestor::IngestorConfig::new(endpoint, token);
+            let req = stx_ingestor::slots_request(stx_core::Commitment::Confirmed);
+            let (tx, mut rx) = tokio::sync::mpsc::channel(1024);
+            let handle = tokio::spawn(async move {
+                if let Err(e) = stx_ingestor::run(cfg, req, tx).await {
+                    eprintln!("stream error: {e}");
+                }
+            });
+            let mut n = 0u32;
+            while let Some(obs) = rx.recv().await {
+                match obs {
+                    stx_ingestor::Observation::Slot { slot, status, .. } => {
+                        println!("slot {slot} {status:?}");
+                        n += 1;
+                    }
+                    stx_ingestor::Observation::Ping => {}
+                    other => println!("{other:?}"),
+                }
+                if n >= count {
+                    break;
+                }
+            }
+            handle.abort();
+        }
         Command::Submit {
             dry_run,
             keypair,
             tip_account,
             timeout,
+            use_agent,
         } => {
             let cfg = config::EngineConfig::load(&keypair)?;
             eprintln!("payer: {}", cfg.payer_pubkey());
@@ -177,9 +219,18 @@ async fn main() -> Result<()> {
                     dry_run,
                     tip_account,
                     confirm_timeout_secs: timeout,
+                    use_agent,
                 },
             )
             .await?;
+
+            if !outcome.decision_records.is_empty() {
+                eprintln!("AI decision records:");
+                eprintln!(
+                    "{}",
+                    serde_json::to_string_pretty(&outcome.decision_records)?
+                );
+            }
 
             // Span waterfall (the latency deltas) from the real run.
             let events = outcome.store.events_for_trace(&outcome.trace_id);
