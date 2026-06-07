@@ -147,6 +147,7 @@ async fn agent_decide(
     tip: Lamports,
     cu_limit: u32,
     attempt: u32,
+    history: Vec<serde_json::Value>,
     failure_ctx: serde_json::Value,
     trace_id: &TraceId,
     ltx: &LogicalTxId,
@@ -164,6 +165,7 @@ async fn agent_decide(
         current_tip: tip.0,
         current_cu: cu_limit,
         attempt,
+        history,
     };
     let agent = ReasoningAgent::new(
         AnthropicClient::new(http.clone(), key.clone()),
@@ -174,7 +176,10 @@ async fn agent_decide(
     let fallback = fallback_remedy(class, floor, tip, cu_limit);
     let (bounded, report) = validate(
         run.decision.clone(),
-        &GuardrailPolicy::default(),
+        &GuardrailPolicy {
+            max_attempts: cfg.max_attempts,
+            ..GuardrailPolicy::default()
+        },
         &ValidationContext {
             attempt,
             blockhash_expired,
@@ -238,6 +243,7 @@ pub async fn submit_and_track(
     let mut slot_out: Option<u64> = None;
     let mut attempt = 0u32;
     let mut decision_records: Vec<DecisionRecord> = Vec::new();
+    let mut history: Vec<serde_json::Value> = Vec::new();
 
     while attempt < cfg.max_attempts {
         attempt += 1;
@@ -395,6 +401,13 @@ pub async fn submit_and_track(
             break;
         }
 
+        history.push(serde_json::json!({
+            "attempt": attempt,
+            "tip_lamports": tip.0,
+            "cu_limit": cu_limit,
+            "outcome": "not_landed",
+            "classified": format!("{:?}", class.kind),
+        }));
         let failure_ctx = serde_json::json!({
             "error": reason,
             "landed": landed_slot.is_some(),
@@ -406,8 +419,8 @@ pub async fn submit_and_track(
         });
         let remedy = if opts.use_agent && cfg.anthropic_key.is_some() {
             match agent_decide(
-                cfg, http, tip_account, &floor, &class, tip, cu_limit, attempt, failure_ctx,
-                &trace_id, &ltx,
+                cfg, http, tip_account, &floor, &class, tip, cu_limit, attempt, history.clone(),
+                failure_ctx, &trace_id, &ltx,
             )
             .await
             {

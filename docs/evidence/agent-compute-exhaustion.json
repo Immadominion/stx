@@ -1,0 +1,98 @@
+{
+  "decision_id": "dec_d54feb3737754258939b8626284ee568",
+  "trace_id": "trc_8c5eb8bf40fa43d0a4b4719625873504",
+  "logical_tx_id": "ltx_5e4a722c30194441b04ba07b5b23396a",
+  "attempt": 1,
+  "at": "2026-06-07T08:58:42.231426Z",
+  "trigger": "fault_injected:compute_exhaustion",
+  "observations": {
+    "blockhash_age_blocks": 20,
+    "cu_consumed": 199950,
+    "cu_requested": 200000,
+    "error": "InstructionError(2, ComputationalBudgetExceeded)",
+    "landed": false,
+    "tip_paid_lamports": 50000
+  },
+  "thinking_summary": "I'll diagnose this. The surface error suggests compute exhaustion, but let me gather evidence to confirm.\nThe evidence strongly points to compute exhaustion:\n- `cu_consumed` (199950) ≈ `cu_requested` (200000) — only 50 CU of headroom, hitting the budget ceiling.\n- Error is `ComputationalBudgetExceeded` at instruction index 2.\n- Blockhash age is 20 blocks (well within ~150 validity, so not expiry).\n- Tip is 50000 lamports, above p50 (30000) and EMA — so not fee starvation.\n- Network congestion is normal.\n\nThis is NOT a tip or blockhash problem. Let me test a higher CU limit to confirm it resolves the failure, while keeping tip the same.\nThe simulation confirms it: with the CU limit raised to 260000, the transaction succeeds (`ok: true`) and actually consumes 199950 CU — meaning the real execution needs slightly more than the original 200000 ceiling, but the prior limit clipped it. The ~30% headroom is comfortable. Committing.",
+  "tool_calls": [
+    {
+      "input": {},
+      "result": {
+        "blockhash_age_blocks": 20,
+        "cu_consumed": 199950,
+        "cu_requested": 200000,
+        "error": "InstructionError(2, ComputationalBudgetExceeded)",
+        "landed": false,
+        "tip_paid_lamports": 50000
+      },
+      "tool": "get_failure_context"
+    },
+    {
+      "input": {},
+      "result": {
+        "attempts": []
+      },
+      "tool": "get_retry_history"
+    },
+    {
+      "input": {},
+      "result": {
+        "congestion": "normal",
+        "current_slot": 312000901,
+        "recent_priority_fee_p50": 12000
+      },
+      "tool": "get_network_conditions"
+    },
+    {
+      "input": {},
+      "result": {
+        "ema_p50": 22696,
+        "p25": 12300,
+        "p50": 30000,
+        "p75": 91863,
+        "p95": 549095,
+        "p99": 4069629
+      },
+      "tool": "get_tip_floor"
+    },
+    {
+      "input": {
+        "cu_limit": 260000,
+        "refresh_blockhash": false,
+        "tip_lamports": 50000
+      },
+      "result": {
+        "cu_consumed": 199950,
+        "ok": true
+      },
+      "tool": "simulate_with_params"
+    }
+  ],
+  "decision": {
+    "action": "raise_cu",
+    "params": {
+      "tip_lamports": 50000,
+      "cu_limit": 260000,
+      "refresh_blockhash": false
+    },
+    "hypotheses": [
+      "Compute exhaustion: cu_consumed (199950) is ~100% of cu_requested (200000), error is ComputationalBudgetExceeded",
+      "Fee starvation: ruled out, tip 50000 > p50 floor 30000 and EMA 22696",
+      "Blockhash expiry: ruled out, age 20 blocks is well within validity window",
+      "Adverse-market/program error: ruled out, error is a budget cap not a logic/slippage revert"
+    ],
+    "chosen_cause": "Compute budget exhaustion — the transaction hit its CU ceiling (199950/200000) and reverted with ComputationalBudgetExceeded at instruction 2.",
+    "justification": "cu_consumed=199950 sits at 99.975% of cu_requested=200000 with the explicit error ComputationalBudgetExceeded(2), the signature of compute exhaustion. This is not fee starvation: tip_paid=50000 already exceeds tip-floor p50=30000 and ema_p50=22696, and congestion is normal. It is not blockhash expiry: age=20 blocks is well within the ~150-block validity window, so a refresh is unnecessary. simulate_with_params(cu_limit=260000, tip unchanged, no refresh) returned ok=true, confirming a higher CU limit (not a higher tip) is the correct, sufficient remedy. Raising CU to 260000 gives ~30% headroom over observed consumption.",
+    "confidence": 0.95,
+    "expected_effect": "With the CU limit raised to 260000, execution completes without hitting the budget cap (consuming ~199950 CU) and the transaction lands; tip and blockhash left unchanged to avoid burning extra fees or unnecessary churn."
+  },
+  "guardrail": {
+    "tip_clamped": false,
+    "action_allowed": true,
+    "overrides": [],
+    "fell_back_to_default": false
+  },
+  "outcome": null,
+  "model": "claude-opus-4-8",
+  "request_id": "req_011Cbod7jjnUUhUWqcDrmYL4"
+}

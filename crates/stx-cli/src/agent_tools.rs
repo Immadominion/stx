@@ -26,6 +26,8 @@ pub struct LiveTools {
     pub current_tip: u64,
     pub current_cu: u32,
     pub attempt: u32,
+    /// Prior attempts (tip/cu/outcome) so the agent can see what already failed.
+    pub history: Vec<Value>,
 }
 
 #[async_trait]
@@ -56,9 +58,10 @@ impl AgentTools for LiveTools {
                 })
             }
             "get_retry_history" => json!({
-                "attempt": self.attempt,
+                "current_attempt": self.attempt,
                 "current_tip_lamports": self.current_tip,
-                "current_cu_limit": self.current_cu
+                "current_cu_limit": self.current_cu,
+                "prior_attempts": self.history,
             }),
             "simulate_with_params" => self.simulate(input).await,
             _ => json!({ "error": format!("unknown tool {name}") }),
