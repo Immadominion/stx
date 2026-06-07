@@ -29,4 +29,3 @@ runs/
 # OS / editor
 .DS_Store
 *.log
-/docs/diagrams/*.png
