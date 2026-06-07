@@ -1,0 +1,114 @@
+{
+  "decision_id": "dec_1a572632aa4c41fe93a5d3c2fe207746",
+  "trace_id": "trc_edbd7f931c8f462cbacee20325faa435",
+  "logical_tx_id": "ltx_d61277caa01a4716bf27e2582e880ac4",
+  "attempt": 1,
+  "at": "2026-06-07T08:58:24.353510Z",
+  "trigger": "fault_injected:fee_starvation",
+  "observations": {
+    "blockhash_age_blocks": 40,
+    "cu_consumed": 0,
+    "cu_requested": 200000,
+    "error": null,
+    "inflight_status": "Pending",
+    "landed": false,
+    "tip_floor_p50": 30000,
+    "tip_paid_lamports": 8000
+  },
+  "thinking_summary": "I'll diagnose this systematically. Let me gather evidence from multiple sources.\nEvidence so far:\n- `cu_consumed: 0` → never executed, so NOT compute exhaustion.\n- `error: null` → no program/market error, so not an abort case.\n- `landed: false`, `inflight_status: Pending` → never landed.\n- `tip_paid: 8000` vs `tip_floor_p50: 30000` → tip is well below p50, even below p25 (12300). Classic fee starvation.\n- `blockhash_age_blocks: 40` → still within the ~150-block validity window, so blockhash isn't the cause.\n\nThis points to fee starvation. Let me test the hypothesis: raising the tip toward p75 should land it. Let me simulate a couple of tip levels (no blockhash refresh needed, CU stays same).\nBoth simulations succeed. Note `cu_consumed: 199950` vs `cu_requested: 200000` — that's very tight (only 50 CU headroom, 99.975% utilization). Even though it passed in sim, this is a landing/inclusion problem, not a compute problem in the diagnosed failure (the real failure had cu_consumed:0, never executed). The tip is the binding constraint.\n\nBoth p50 (30000) and p75 (91863) land in sim. I'll choose p75 to give a real margin above the p50 floor, since at exactly p50 the prior 8000-lamport submission's starvation shows the market is competitive and p50 is only the median (50% miss). p75 buys reliable inclusion without overpaying into p95 territory.",
+  "tool_calls": [
+    {
+      "input": {},
+      "result": {
+        "blockhash_age_blocks": 40,
+        "cu_consumed": 0,
+        "cu_requested": 200000,
+        "error": null,
+        "inflight_status": "Pending",
+        "landed": false,
+        "tip_floor_p50": 30000,
+        "tip_paid_lamports": 8000
+      },
+      "tool": "get_failure_context"
+    },
+    {
+      "input": {},
+      "result": {
+        "congestion": "normal",
+        "current_slot": 312000901,
+        "recent_priority_fee_p50": 12000
+      },
+      "tool": "get_network_conditions"
+    },
+    {
+      "input": {},
+      "result": {
+        "ema_p50": 22696,
+        "p25": 12300,
+        "p50": 30000,
+        "p75": 91863,
+        "p95": 549095,
+        "p99": 4069629
+      },
+      "tool": "get_tip_floor"
+    },
+    {
+      "input": {},
+      "result": {
+        "attempts": []
+      },
+      "tool": "get_retry_history"
+    },
+    {
+      "input": {
+        "cu_limit": 200000,
+        "refresh_blockhash": false,
+        "tip_lamports": 91863
+      },
+      "result": {
+        "cu_consumed": 199950,
+        "ok": true
+      },
+      "tool": "simulate_with_params"
+    },
+    {
+      "input": {
+        "cu_limit": 200000,
+        "refresh_blockhash": false,
+        "tip_lamports": 30000
+      },
+      "result": {
+        "cu_consumed": 199950,
+        "ok": true
+      },
+      "tool": "simulate_with_params"
+    }
+  ],
+  "decision": {
+    "action": "raise_tip",
+    "params": {
+      "tip_lamports": 91863,
+      "cu_limit": 200000,
+      "refresh_blockhash": false
+    },
+    "hypotheses": [
+      "Fee starvation: tip 8000 << floor p50 30000, never landed (cu_consumed=0, Pending)",
+      "Blockhash expiry: ruled out, age 40 blocks within ~150 validity window",
+      "Compute exhaustion: ruled out, cu_consumed=0 (never executed)",
+      "Adverse market/program error: ruled out, error=null"
+    ],
+    "chosen_cause": "Fee starvation — tip below the Jito tip floor caused the bundle to never be included",
+    "justification": "tip_paid_lamports=8000 is below even tip floor p25=12300 and far below p50=30000; landed=false with inflight_status=Pending and cu_consumed=0 means the tx never executed (not compute exhaustion) and error=null rules out a program/market abort. blockhash_age_blocks=40 is within the ~150-block validity window, so no refresh is needed. Simulation at 91863 (p75) succeeded (ok=true), as did p50; I chose p75 for reliable inclusion margin above the median floor without overpaying toward p95=549095.",
+    "confidence": 0.9,
+    "expected_effect": "Raising the tip from 8000 to 91863 (p75) lifts it above the p50 floor of 30000, securing block inclusion so the bundle lands; no blockhash refresh or CU change required."
+  },
+  "guardrail": {
+    "tip_clamped": false,
+    "action_allowed": true,
+    "overrides": [],
+    "fell_back_to_default": false
+  },
+  "outcome": null,
+  "model": "claude-opus-4-8",
+  "request_id": "req_011Cbod6Ms7WB8tWQz2GroGV"
+}

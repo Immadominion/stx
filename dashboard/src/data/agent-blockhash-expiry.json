@@ -1,0 +1,122 @@
+{
+  "decision_id": "dec_5f8b40ed385e4899b832e4557d024fe3",
+  "trace_id": "trc_82d5fdd7794742dbb2373b786cf6078f",
+  "logical_tx_id": "ltx_e8316c5f9cc44c5dae2b796a57fcaaba",
+  "attempt": 1,
+  "at": "2026-06-07T08:58:03.935735Z",
+  "trigger": "fault_injected:blockhash_expiry",
+  "observations": {
+    "blockhash_age_blocks": 162,
+    "cu_consumed": 0,
+    "cu_requested": 200000,
+    "error": "TransactionExpiredBlockheightExceeded",
+    "landed": false,
+    "tip_paid_lamports": 50000
+  },
+  "thinking_summary": "I'll diagnose this failure by gathering evidence from the available tools.\nThe evidence points clearly to blockhash expiry:\n\n- `blockhash_age_blocks: 162` — far beyond the ~150-block validity window, so the blockhash is definitively expired.\n- `cu_consumed: 0` — the transaction never executed, ruling out compute exhaustion (would need CU consumed ≈ requested).\n- `error: TransactionExpiredBlockheightExceeded` — the canonical expiry signal.\n- `tip_paid_lamports: 50000` — already above p50 (30000) and well above the EMA (22696). Congestion is \"normal.\" This is NOT fee starvation; the tip is healthy.\n\nLet me test the refresh hypothesis before committing.\nWait — the simulation shows `cu_consumed: 199950` against a `cu_limit` of 200000. That's a razor-thin 50-CU margin (99.975% utilization). While the refresh succeeds in simulation, that margin is dangerously tight; under real execution the transaction could tip into compute exhaustion. Let me verify whether the tight margin is real and test a small CU bump.\nBoth simulations succeed and consume a stable 199950 CU regardless of the limit. The consumption is fixed at 199950 — it's not bumping against the ceiling (raising the limit to 220000 didn't change consumption), so this is genuine real CU usage with a real, if thin, 50-CU headroom under the original 200000 limit. The transaction executes fine; the only thing that killed it was the expired blockhash.\n\nThe root cause is unambiguously **blockhash expiry**. The correct remedy is to refresh the blockhash and leave the tip unchanged.",
+  "tool_calls": [
+    {
+      "input": {},
+      "result": {
+        "blockhash_age_blocks": 162,
+        "cu_consumed": 0,
+        "cu_requested": 200000,
+        "error": "TransactionExpiredBlockheightExceeded",
+        "landed": false,
+        "tip_paid_lamports": 50000
+      },
+      "tool": "get_failure_context"
+    },
+    {
+      "input": {},
+      "result": {
+        "congestion": "normal",
+        "current_slot": 312000901,
+        "recent_priority_fee_p50": 12000
+      },
+      "tool": "get_network_conditions"
+    },
+    {
+      "input": {},
+      "result": {
+        "attempts": []
+      },
+      "tool": "get_retry_history"
+    },
+    {
+      "input": {},
+      "result": {
+        "ema_p50": 22696,
+        "p25": 12300,
+        "p50": 30000,
+        "p75": 91863,
+        "p95": 549095,
+        "p99": 4069629
+      },
+      "tool": "get_tip_floor"
+    },
+    {
+      "input": {
+        "cu_limit": 200000,
+        "refresh_blockhash": true,
+        "tip_lamports": 50000
+      },
+      "result": {
+        "cu_consumed": 199950,
+        "ok": true
+      },
+      "tool": "simulate_with_params"
+    },
+    {
+      "input": {
+        "cu_limit": 200000,
+        "refresh_blockhash": true,
+        "tip_lamports": 50000
+      },
+      "result": {
+        "cu_consumed": 199950,
+        "ok": true
+      },
+      "tool": "simulate_with_params"
+    },
+    {
+      "input": {
+        "cu_limit": 220000,
+        "refresh_blockhash": true,
+        "tip_lamports": 50000
+      },
+      "result": {
+        "cu_consumed": 199950,
+        "ok": true
+      },
+      "tool": "simulate_with_params"
+    }
+  ],
+  "decision": {
+    "action": "resubmit_new_blockhash",
+    "params": {
+      "tip_lamports": 50000,
+      "cu_limit": 200000,
+      "refresh_blockhash": true
+    },
+    "hypotheses": [
+      "Blockhash expiry: age 162 blocks > ~150 validity window, cu_consumed=0, error=TransactionExpiredBlockheightExceeded",
+      "Compute exhaustion: ruled out — cu_consumed was 0 at failure; sim shows fixed 199950 CU usage that does not rise with the limit",
+      "Fee starvation: ruled out — tip 50000 > p50 (30000) and > EMA (22696), congestion normal",
+      "Adverse-market/program error: ruled out — no program error and sim succeeds cleanly"
+    ],
+    "chosen_cause": "Blockhash expiry (TransactionExpiredBlockheightExceeded)",
+    "justification": "blockhash_age_blocks=162 exceeds the ~150-block validity window, and cu_consumed=0 proves the tx never executed (not compute exhaustion). The error is the canonical TransactionExpiredBlockheightExceeded. Tip is not the problem: 50000 lamports already exceeds tip-floor p50=30000 and EMA=22696 under 'normal' congestion, so no tip raise is warranted. Simulation with refresh_blockhash=true succeeds (ok=true) at the unchanged tip; raising cu_limit to 220000 left consumption fixed at 199950, confirming a real ~50-CU margin rather than a ceiling collision. The remedy is purely a blockhash refresh with no tip change.",
+    "confidence": 0.93,
+    "expected_effect": "A fresh blockhash restores validity so the tx can land; it executes consuming ~199950 CU within the 200000 limit. Tip stays at 50000 since it is already above floor/EMA."
+  },
+  "guardrail": {
+    "tip_clamped": false,
+    "action_allowed": true,
+    "overrides": [],
+    "fell_back_to_default": false
+  },
+  "outcome": null,
+  "model": "claude-opus-4-8",
+  "request_id": "req_011Cbod4iT4T6RKdmKhFUhBA"
+}

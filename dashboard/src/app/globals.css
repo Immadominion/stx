@@ -1,0 +1,80 @@
+@import "tailwindcss";
+
+@theme {
+  /* Surfaces + ink (pure-white canvas; mood lives in accent + type) */
+  --color-canvas: oklch(1 0 0);
+  --color-surface: oklch(0.985 0.001 255);
+  --color-sunk: oklch(0.972 0.002 255);
+  --color-border: oklch(0.922 0.003 255);
+  --color-border-strong: oklch(0.86 0.004 255);
+  --color-ink: oklch(0.23 0.012 260);
+  --color-ink-2: oklch(0.46 0.01 260);
+  --color-ink-3: oklch(0.58 0.008 260);
+
+  /* Brand: olive-lime, identity + interaction only (never status) */
+  --color-brand: oklch(0.74 0.15 118);
+  --color-brand-ink: oklch(0.43 0.13 118);
+  --color-brand-wash: oklch(0.965 0.03 118);
+
+  /* Lifecycle status (always paired with an icon + label in UI) */
+  --color-st-submitted: oklch(0.62 0.012 260);
+  --color-st-pending: oklch(0.72 0.15 70);
+  --color-st-landed: oklch(0.64 0.14 150);
+  --color-st-confirmed: oklch(0.55 0.14 152);
+  --color-st-finalized: oklch(0.52 0.11 215);
+  --color-st-failed: oklch(0.56 0.2 25);
+
+  /* status text variants (hold AA on white) */
+  --color-st-pending-ink: oklch(0.5 0.13 70);
+  --color-st-landed-ink: oklch(0.46 0.13 150);
+  --color-st-confirmed-ink: oklch(0.45 0.14 152);
+  --color-st-finalized-ink: oklch(0.46 0.11 215);
+  --color-st-failed-ink: oklch(0.5 0.2 25);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, "SF Mono", Menlo, monospace;
+
+  --radius-card: 10px;
+
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: var(--color-brand-wash);
+  color: var(--color-brand-ink);
+}
+
+/* Visible, consistent focus ring */
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Tabular, trustworthy numerics everywhere mono is used */
+.font-mono {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1, "ss01" 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
