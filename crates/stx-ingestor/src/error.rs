@@ -13,4 +13,7 @@ pub enum IngestError {
 
     #[error("stream status: {0}")]
     Status(#[from] tonic::Status),
+
+    #[error("gRPC connect timed out")]
+    ConnectTimeout,
 }

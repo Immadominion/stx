@@ -12,6 +12,7 @@
 pub mod bundle;
 pub mod classify;
 pub mod error;
+mod net;
 pub mod rpc;
 pub mod solrpc;
 pub mod tip;

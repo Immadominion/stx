@@ -16,6 +16,15 @@ pub const DEFAULT_API_BASE: &str = "https://api.anthropic.com";
 pub const ANTHROPIC_VERSION: &str = "2023-06-01";
 pub const DEFAULT_MODEL: &str = "claude-opus-4-8";
 
+/// Per-request timeout for the Messages API (Opus reasoning turns can be slow).
+const REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(90);
+const MAX_TRIES: u32 = 3;
+
+/// 1s, 2s, 4s, ...
+fn backoff(attempt: u32) -> std::time::Duration {
+    std::time::Duration::from_millis(500u64 << attempt.min(4))
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct MessagesRequest {
     pub model: String,
@@ -139,32 +148,54 @@ impl AnthropicClient {
 
     pub async fn create(&self, req: &MessagesRequest) -> Result<MessagesResponse, AgentError> {
         let url = format!("{}/v1/messages", self.base_url.trim_end_matches('/'));
-        let resp = self
-            .http
-            .post(url)
-            .header("x-api-key", &self.api_key)
-            .header("anthropic-version", ANTHROPIC_VERSION)
-            .header("content-type", "application/json")
-            .json(req)
-            .send()
-            .await?;
-        let status = resp.status();
-        let request_id = resp
-            .headers()
-            .get("request-id")
-            .and_then(|v| v.to_str().ok())
-            .map(String::from);
-        let text = resp.text().await?;
-        if !status.is_success() {
-            return Err(AgentError::Api {
-                status: status.as_u16(),
-                body: text,
-            });
+        let mut attempt = 0u32;
+        loop {
+            attempt += 1;
+            let send = self
+                .http
+                .post(&url)
+                .header("x-api-key", &self.api_key)
+                .header("anthropic-version", ANTHROPIC_VERSION)
+                .header("content-type", "application/json")
+                .timeout(REQUEST_TIMEOUT)
+                .json(req)
+                .send()
+                .await;
+            let resp = match send {
+                Ok(r) => r,
+                Err(e) => {
+                    if attempt < MAX_TRIES && (e.is_timeout() || e.is_connect()) {
+                        tokio::time::sleep(backoff(attempt)).await;
+                        continue;
+                    }
+                    return Err(AgentError::Http(e));
+                }
+            };
+            let status = resp.status();
+            // 429 (rate limit), 529 (overloaded), and 5xx are transient.
+            if matches!(status.as_u16(), 429 | 500 | 502 | 503 | 504 | 529)
+                && attempt < MAX_TRIES
+            {
+                tokio::time::sleep(backoff(attempt)).await;
+                continue;
+            }
+            let request_id = resp
+                .headers()
+                .get("request-id")
+                .and_then(|v| v.to_str().ok())
+                .map(String::from);
+            let text = resp.text().await?;
+            if !status.is_success() {
+                return Err(AgentError::Api {
+                    status: status.as_u16(),
+                    body: text,
+                });
+            }
+            let value: Value = serde_json::from_str(&text)?;
+            let mut parsed: MessagesResponse = serde_json::from_value(value.clone())?;
+            parsed.raw = value;
+            parsed.request_id = request_id;
+            return Ok(parsed);
         }
-        let value: Value = serde_json::from_str(&text)?;
-        let mut parsed: MessagesResponse = serde_json::from_value(value.clone())?;
-        parsed.raw = value;
-        parsed.request_id = request_id;
-        Ok(parsed)
     }
 }

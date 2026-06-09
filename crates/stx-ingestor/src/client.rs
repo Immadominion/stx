@@ -39,12 +39,14 @@ impl IngestorConfig {
 
 /// Establish a connected client (TLS, x-token, raised decode limit).
 pub async fn connect(cfg: &IngestorConfig) -> Result<GeyserGrpcClient, IngestError> {
-    let client = GeyserGrpcClient::build_from_shared(cfg.endpoint.clone())?
+    let builder = GeyserGrpcClient::build_from_shared(cfg.endpoint.clone())?
         .x_token(cfg.x_token.clone())?
         .tls_config(ClientTlsConfig::new().with_native_roots())?
-        .max_decoding_message_size(cfg.max_decoding_message_size)
-        .connect()
-        .await?;
+        .max_decoding_message_size(cfg.max_decoding_message_size);
+    // Bound the connect so a dead endpoint fails fast rather than hanging.
+    let client = tokio::time::timeout(std::time::Duration::from_secs(12), builder.connect())
+        .await
+        .map_err(|_| IngestError::ConnectTimeout)??;
     Ok(client)
 }
 

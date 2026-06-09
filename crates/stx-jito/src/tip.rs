@@ -76,6 +76,7 @@ impl TipFloorClient {
         let body = self
             .http
             .get(&self.url)
+            .timeout(crate::net::REQUEST_TIMEOUT)
             .send()
             .await?
             .error_for_status()?

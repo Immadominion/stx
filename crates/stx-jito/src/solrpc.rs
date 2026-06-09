@@ -120,12 +120,7 @@ impl SolanaRpc {
             method,
             params,
         };
-        let resp = self.http.post(&self.url).json(&req).send().await?;
-        let status = resp.status();
-        let text = resp.text().await?;
-        if !status.is_success() {
-            return Err(JitoError::Invalid(format!("HTTP {status}: {text}")));
-        }
+        let text = crate::net::post_json_with_retry(&self.http, &self.url, &req).await?;
         let parsed: Resp<T> = serde_json::from_str(&text)?;
         if let Some(e) = parsed.error {
             return Err(JitoError::Rpc {

@@ -15,6 +15,7 @@ mod engine;
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
+use std::time::Duration;
 use stx_agent::{
     build_record, validate, AgentConfig, AnthropicClient, FaultScenario, GuardrailPolicy, MockTools,
     ReasoningAgent, ValidationContext,
@@ -111,6 +112,8 @@ fn fallback_decision() -> Decision {
 async fn main() -> Result<()> {
     let cli = Cli::parse();
     let http = reqwest::Client::builder()
+        .connect_timeout(Duration::from_secs(8))
+        .timeout(Duration::from_secs(120))
         .build()
         .context("building http client")?;
 
