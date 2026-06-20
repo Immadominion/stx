@@ -64,6 +64,30 @@ pub fn signature_request(signature: &str, commitment: Commitment) -> SubscribeRe
     }
 }
 
+/// Subscribe to non-vote transactions that touch `account` (e.g. the fee
+/// payer). A bare `signature` filter is silently ignored by some geyser
+/// providers, but an `account_include` filter is well supported; the caller
+/// matches the exact signature in code. Emits at `commitment`.
+pub fn account_tx_request(account: &str, commitment: Commitment) -> SubscribeRequest {
+    let mut transactions = HashMap::new();
+    transactions.insert(
+        "tx".to_string(),
+        SubscribeRequestFilterTransactions {
+            vote: Some(false),
+            failed: None,
+            signature: None,
+            account_include: vec![account.to_string()],
+            account_exclude: vec![],
+            account_required: vec![],
+        },
+    );
+    SubscribeRequest {
+        transactions,
+        commitment: Some(commitment_to_proto(commitment)),
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -84,6 +108,16 @@ mod tests {
         assert_eq!(req.commitment, Some(0));
         let f = req.transactions.get("tx").unwrap();
         assert_eq!(f.signature.as_deref(), Some("SIGabc"));
+        assert_eq!(f.vote, Some(false));
+    }
+
+    #[test]
+    fn account_tx_request_shape() {
+        let req = account_tx_request("PAYERpubkey", Commitment::Processed);
+        assert_eq!(req.commitment, Some(0));
+        let f = req.transactions.get("tx").unwrap();
+        assert_eq!(f.account_include, vec!["PAYERpubkey".to_string()]);
+        assert_eq!(f.signature, None);
         assert_eq!(f.vote, Some(false));
     }
 }

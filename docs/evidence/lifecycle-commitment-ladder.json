@@ -1,0 +1,175 @@
+[
+  {
+    "seq": 0,
+    "at": "2026-06-20T23:35:13.773131Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "drafted",
+      "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29"
+    }
+  },
+  {
+    "seq": 1,
+    "at": "2026-06-20T23:35:14.951019Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "tip_decided",
+      "tip_lamports": 10000,
+      "source": "static_policy"
+    }
+  },
+  {
+    "seq": 2,
+    "at": "2026-06-20T23:35:14.952028Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "built",
+      "signatures": [
+        "4TYbjsJBw4UNjqiVoPNinaMQAFjzvaoWRzBoJHCRvqwWhtBLNBCxJ1zJLM74pNhqdoHernkwULSWfnmRiaFdtmco"
+      ]
+    }
+  },
+  {
+    "seq": 3,
+    "at": "2026-06-20T23:35:15.101158Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "dispatched",
+      "bundle_id": "599d531b42b0bba5d27b91d467f4d0c044aae5cdd14595b9631bc3b3a8a4aca6",
+      "regions": [
+        "https://frankfurt.mainnet.block-engine.jito.wtf"
+      ]
+    }
+  },
+  {
+    "seq": 4,
+    "at": "2026-06-20T23:35:15.101160Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "marked_inflight"
+    }
+  },
+  {
+    "seq": 5,
+    "at": "2026-06-20T23:36:00.388828Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "failed",
+      "class": {
+        "kind": "dropped",
+        "evidence": "never landed and no specific signal; treated as dropped",
+        "confidence": 0.5,
+        "raw_error": null,
+        "at_slot": null
+      }
+    }
+  },
+  {
+    "seq": 6,
+    "at": "2026-06-20T23:36:00.388953Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "retry_scheduled",
+      "child_trace": "trc_601354d519774858b1ee34b3085b2916",
+      "attempt": 2
+    }
+  },
+  {
+    "seq": 7,
+    "at": "2026-06-20T23:36:00.536296Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "tip_decided",
+      "tip_lamports": 100000,
+      "source": "static_policy"
+    }
+  },
+  {
+    "seq": 8,
+    "at": "2026-06-20T23:36:00.537155Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "built",
+      "signatures": [
+        "3WMmYsBk5RntVbFqQXLPFxUi1AJTFZm9vojuQ2JpT8JUz7RDtsW2xUCnaSVTS1aqJFq9D1H6te1JY2817KtTP3Fj"
+      ]
+    }
+  },
+  {
+    "seq": 9,
+    "at": "2026-06-20T23:36:00.684621Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "dispatched",
+      "bundle_id": "3c2bdc3246f04c99a81504b12fbd02c3bb47e78e2982c96122f74ffb8b8e8f84",
+      "regions": [
+        "https://frankfurt.mainnet.block-engine.jito.wtf"
+      ]
+    }
+  },
+  {
+    "seq": 10,
+    "at": "2026-06-20T23:36:00.684623Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": null,
+    "event": {
+      "type": "marked_inflight"
+    }
+  },
+  {
+    "seq": 11,
+    "at": "2026-06-20T23:36:01.333912Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": 427824572,
+    "event": {
+      "type": "landed",
+      "slot": 427824572
+    }
+  },
+  {
+    "seq": 12,
+    "at": "2026-06-20T23:36:01.980791Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": 427824572,
+    "event": {
+      "type": "commitment_reached",
+      "commitment": "confirmed",
+      "slot": 427824572
+    }
+  },
+  {
+    "seq": 13,
+    "at": "2026-06-20T23:36:14.187678Z",
+    "trace_id": "trc_1369c10772ce4e758e8e6d7a7848d980",
+    "logical_tx_id": "ltx_031ef04022d2483397fb2bd4e4c97f29",
+    "slot": 427824572,
+    "event": {
+      "type": "commitment_reached",
+      "commitment": "finalized",
+      "slot": 427824572
+    }
+  }
+]

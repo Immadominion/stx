@@ -30,7 +30,7 @@ use stx_core::{
     fallback_remedy, AgentAction, Commitment, Decision, DecisionRecord, EventStore, FailureClass,
     FailureKind, Lamports, LifecycleEvent, LogicalTxId, Slot, TipFloor, TipSource, TraceId,
 };
-use stx_ingestor::{run as ingestor_run, signature_request, IngestorConfig, Observation};
+use stx_ingestor::{run as ingestor_run, account_tx_request, IngestorConfig, Observation};
 use stx_jito::{
     build_bundle, classify, recommend_tip, BundleParams, Congestion, FailureSignals, JitoClient,
     SolanaRpc, TipFloorClient,
@@ -68,13 +68,17 @@ fn default_floor() -> TipFloor {
     }
 }
 
-/// Spawn a Yellowstone subscription on `signature` (at `confirmed`) and forward
-/// the first matching landing as `(slot, exec_failed)`. Spawned BEFORE the
-/// bundle is submitted so a sub-second landing is never missed. With no endpoint
-/// configured the receiver is simply never fed (RPC then carries confirmation).
+/// Spawn a Yellowstone subscription on the fee `payer`'s non-vote transactions
+/// at `processed` (BEFORE the bundle is submitted, so a sub-second landing is
+/// never missed) and forward the first one whose signature matches as
+/// `(slot, exec_failed)`. We filter by account (not by a bare `signature`
+/// filter, which some geyser providers silently ignore) and match the exact
+/// signature in code. With no endpoint configured the receiver is simply never
+/// fed (RPC then confirms).
 fn spawn_signature_stream(
     endpoint: Option<&str>,
     x_token: Option<String>,
+    payer: &str,
     signature: &str,
 ) -> (mpsc::Receiver<(u64, bool)>, JoinHandle<()>) {
     let (hit_tx, hit_rx) = mpsc::channel::<(u64, bool)>(4);
@@ -82,7 +86,7 @@ fn spawn_signature_stream(
         return (hit_rx, tokio::spawn(async {}));
     };
     let icfg = IngestorConfig::new(endpoint.to_string(), x_token);
-    let req = signature_request(signature, Commitment::Confirmed);
+    let req = account_tx_request(payer, Commitment::Processed);
     let target = signature.to_string();
     let handle = tokio::spawn(async move {
         let (obs_tx, mut obs_rx) = mpsc::channel(64);
@@ -107,31 +111,105 @@ fn spawn_signature_stream(
     (hit_rx, handle)
 }
 
-/// Await landing via the pre-opened stream OR an authoritative RPC
-/// `getSignatureStatuses` poll, whichever is first. Returns
-/// `(slot, exec_failed, source)`, or `None` on timeout.
-async fn await_landing(
+/// Track a submitted signature through the commitment ladder, recording the
+/// processed (landed), confirmed, and finalized milestones into `store` with
+/// their real timestamps. Landing is detected from the pre-opened signature
+/// stream (validator ground truth) with an RPC `getSignatureStatuses` fallback;
+/// the confirmed -> finalized progression is then measured by fast RPC polling
+/// (authoritative for commitment), so each delta reflects real wall-clock time.
+/// Returns `(slot, exec_failed)` once the transaction is on-chain, or `None` if
+/// it never lands within `land_timeout`. Once on-chain it is never resubmitted.
+#[allow(clippy::too_many_arguments)]
+async fn track_commitments(
     hit_rx: &mut mpsc::Receiver<(u64, bool)>,
     rpc: &SolanaRpc,
     signature: &str,
-    timeout: Duration,
-) -> Option<(u64, bool, &'static str)> {
-    let start = tokio::time::Instant::now();
+    store: &mut EventStore,
+    trace_id: &TraceId,
+    ltx: &LogicalTxId,
+    land_timeout: Duration,
+    finalize_timeout: Duration,
+) -> Option<(u64, bool)> {
     let sigs = [signature.to_string()];
-    loop {
-        if let Ok((slot, failed)) = hit_rx.try_recv() {
-            return Some((slot, failed, "stream"));
-        }
-        if let Ok(statuses) = rpc.get_signature_statuses(&sigs).await {
-            if let Some(Some(st)) = statuses.first() {
-                return Some((st.slot, !st.succeeded(), "rpc"));
+    let record = |store: &mut EventStore, ev: LifecycleEvent, slot: u64| {
+        store.append(trace_id.clone(), ltx.clone(), Some(Slot(slot)), ev);
+    };
+
+    // Phase 1: await landing (processed). The signature stream (validator ground
+    // truth, subscribed before submit) is the race-free safety net; RPC
+    // `getSignatureStatuses` is polled every 500ms so the `processed` stage is
+    // caught before the ~0.6s jump to confirmed (which keeps the first ladder
+    // delta accurate). `biased` checks the stream first on every wake.
+    let start = tokio::time::Instant::now();
+    let mut rpc_tick = tokio::time::interval(Duration::from_millis(500));
+    rpc_tick.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+    let mut landed: Option<(u64, bool)> = None;
+    let mut stream_open = true;
+    while landed.is_none() {
+        tokio::select! {
+            biased;
+            hit = hit_rx.recv(), if stream_open => match hit {
+                Some((slot, failed)) => {
+                    landed = Some((slot, failed));
+                    eprintln!("  processed: slot {slot} (stream)");
+                }
+                None => stream_open = false,
+            },
+            _ = rpc_tick.tick() => {
+                if let Ok(statuses) = rpc.get_signature_statuses(&sigs).await {
+                    if let Some(Some(st)) = statuses.first() {
+                        landed = Some((st.slot, !st.succeeded()));
+                        eprintln!("  processed: slot {} (rpc)", st.slot);
+                    }
+                }
             }
         }
-        if start.elapsed() >= timeout {
+        if landed.is_none() && start.elapsed() >= land_timeout {
             return None;
         }
-        tokio::time::sleep(Duration::from_millis(1500)).await;
     }
+    let (slot, failed) = landed.unwrap();
+    record(store, LifecycleEvent::Landed { slot: Slot(slot) }, slot);
+
+    // Phase 2: measure the confirmed -> finalized progression by fast polling.
+    let mut got_confirmed = false;
+    let phase2 = tokio::time::Instant::now();
+    while phase2.elapsed() < finalize_timeout {
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        let Ok(statuses) = rpc.get_signature_statuses(&sigs).await else {
+            continue;
+        };
+        let Some(Some(st)) = statuses.first() else {
+            continue;
+        };
+        let c = st.commitment();
+        if !got_confirmed && matches!(c, Some(Commitment::Confirmed) | Some(Commitment::Finalized)) {
+            got_confirmed = true;
+            record(
+                store,
+                LifecycleEvent::CommitmentReached {
+                    commitment: Commitment::Confirmed,
+                    slot: Slot(slot),
+                },
+                slot,
+            );
+            eprintln!("  confirmed: slot {slot}");
+        }
+        if matches!(c, Some(Commitment::Finalized)) {
+            record(
+                store,
+                LifecycleEvent::CommitmentReached {
+                    commitment: Commitment::Finalized,
+                    slot: Slot(slot),
+                },
+                slot,
+            );
+            eprintln!("  finalized: slot {slot}");
+            break;
+        }
+    }
+
+    Some((slot, failed))
 }
 
 /// Ask the AI agent to choose the retry remedy, grounded in live tools and
@@ -297,11 +375,12 @@ pub async fn submit_and_track(
             break;
         }
 
-        // Open the signature subscription BEFORE submitting (avoids the race
-        // where a sub-second landing is missed; streams only go forward).
+        // Open the signature subscription BEFORE submitting (so a sub-second
+        // landing is never missed; streams only go forward).
         let (mut hit_rx, stream_handle) = spawn_signature_stream(
             cfg.yellowstone_endpoint.as_deref(),
             cfg.yellowstone_x_token.clone(),
+            &cfg.payer_pubkey().to_string(),
             &sig,
         );
 
@@ -323,43 +402,33 @@ pub async fn submit_and_track(
             tip.0
         );
 
-        let timeout = Duration::from_secs(opts.confirm_timeout_secs);
-        let landing = await_landing(&mut hit_rx, &rpc, &sig, timeout).await;
+        // Track the commitment ladder (processed -> confirmed -> finalized),
+        // recording each stage with its real timestamp.
+        let land_timeout = Duration::from_secs(opts.confirm_timeout_secs);
+        let finalize_timeout = Duration::from_secs(25);
+        let landing = track_commitments(
+            &mut hit_rx,
+            &rpc,
+            &sig,
+            &mut store,
+            &trace_id,
+            &ltx,
+            land_timeout,
+            finalize_timeout,
+        )
+        .await;
         stream_handle.abort();
 
-        // Success: landed and executed cleanly.
-        if let Some((slot, false, source)) = landing {
-            store.append(
-                trace_id.clone(),
-                ltx.clone(),
-                Some(Slot(slot)),
-                LifecycleEvent::Landed { slot: Slot(slot) },
-            );
-            store.append(
-                trace_id.clone(),
-                ltx.clone(),
-                Some(Slot(slot)),
-                LifecycleEvent::CommitmentReached {
-                    commitment: Commitment::Confirmed,
-                    slot: Slot(slot),
-                },
-            );
-            eprintln!("LANDED slot={slot} via {source}  https://solscan.io/tx/{sig}");
+        // Success: landed and executed cleanly (the ladder is already recorded).
+        if let Some((slot, false)) = landing {
+            eprintln!("LANDED slot={slot}  https://solscan.io/tx/{sig}");
             landed = true;
             slot_out = Some(slot);
             break;
         }
 
-        // Not landed (or landed but execution failed): record + classify.
-        let landed_slot: Option<u64> = landing.map(|(slot, _, _)| slot);
-        if let Some(slot) = landed_slot {
-            store.append(
-                trace_id.clone(),
-                ltx.clone(),
-                Some(Slot(slot)),
-                LifecycleEvent::Landed { slot: Slot(slot) },
-            );
-        }
+        // Not landed (or landed but execution failed): classify and retry.
+        let landed_slot: Option<u64> = landing.map(|(slot, _)| slot);
         let reason = if landed_slot.is_some() {
             "landed but execution failed".to_string()
         } else {

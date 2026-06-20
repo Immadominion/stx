@@ -15,4 +15,6 @@ pub mod request;
 pub use client::{connect, run, IngestorConfig, DEFAULT_MAX_DECODING_SIZE};
 pub use error::IngestError;
 pub use observation::{normalize, Observation, SlotStatusKind};
-pub use request::{commitment_to_proto, signature_request, slots_request};
+pub use request::{
+    account_tx_request, commitment_to_proto, signature_request, slots_request,
+};
