@@ -157,6 +157,15 @@ impl SolanaRpc {
         .await
     }
 
+    /// `getSlot` - the cluster's current slot at `commitment`.
+    pub async fn get_slot(&self, commitment: Commitment) -> Result<u64, JitoError> {
+        self.call(
+            "getSlot",
+            json!([{ "commitment": commitment_str(commitment) }]),
+        )
+        .await
+    }
+
     /// `simulateTransaction` - replaces the blockhash so a stale one doesn't
     /// reject the sim; `sigVerify` must then be false.
     pub async fn simulate_transaction(
@@ -200,6 +209,51 @@ impl SolanaRpc {
             .await?;
         Ok(cv.value)
     }
+
+    /// `getSlotLeaders` - the validator identities scheduled to produce
+    /// `[start_slot, start_slot + limit)`. Used to annotate which leader
+    /// produced a landed slot and to show the upcoming leader window. Solana
+    /// rotates leaders every 4 consecutive slots.
+    pub async fn get_slot_leaders(
+        &self,
+        start_slot: u64,
+        limit: u64,
+    ) -> Result<Vec<String>, JitoError> {
+        self.call("getSlotLeaders", json!([start_slot, limit]))
+            .await
+    }
+}
+
+/// A run of consecutive slots produced by the same leader.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LeaderWindow {
+    pub leader: String,
+    pub first_slot: u64,
+    pub last_slot: u64,
+}
+
+impl LeaderWindow {
+    pub fn slot_count(&self) -> u64 {
+        self.last_slot - self.first_slot + 1
+    }
+}
+
+/// Group a leader list (as returned by `getSlotLeaders` starting at
+/// `start_slot`) into consecutive same-leader windows.
+pub fn leader_windows(start_slot: u64, leaders: &[String]) -> Vec<LeaderWindow> {
+    let mut out: Vec<LeaderWindow> = Vec::new();
+    for (i, leader) in leaders.iter().enumerate() {
+        let slot = start_slot + i as u64;
+        match out.last_mut() {
+            Some(w) if &w.leader == leader && w.last_slot + 1 == slot => w.last_slot = slot,
+            _ => out.push(LeaderWindow {
+                leader: leader.clone(),
+                first_slot: slot,
+                last_slot: slot,
+            }),
+        }
+    }
+    out
 }
 
 /// Whether a blockhash has expired: the cluster's block height has passed the
@@ -241,6 +295,21 @@ mod tests {
         let v = parsed.result.unwrap();
         assert_eq!(v.len(), 2);
         assert_eq!(v[1].prioritization_fee, 12000);
+    }
+
+    #[test]
+    fn groups_leader_windows() {
+        let leaders: Vec<String> = ["A", "A", "A", "A", "B", "B", "C"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let w = leader_windows(100, &leaders);
+        assert_eq!(w.len(), 3);
+        assert_eq!(w[0].leader, "A");
+        assert_eq!((w[0].first_slot, w[0].last_slot), (100, 103));
+        assert_eq!(w[0].slot_count(), 4);
+        assert_eq!((w[1].leader.as_str(), w[1].first_slot, w[1].last_slot), ("B", 104, 105));
+        assert_eq!((w[2].leader.as_str(), w[2].first_slot), ("C", 106));
     }
 
     #[test]

@@ -48,6 +48,8 @@ pub struct SubmitOutcome {
     pub landed: bool,
     pub signature: Option<String>,
     pub slot: Option<u64>,
+    /// Validator identity that produced the landing slot (leader-window context).
+    pub leader: Option<String>,
     pub attempts: u32,
     pub trace_id: TraceId,
     pub store: EventStore,
@@ -319,6 +321,7 @@ pub async fn submit_and_track(
     let mut landed = false;
     let mut signature: Option<String> = None;
     let mut slot_out: Option<u64> = None;
+    let mut leader_out: Option<String> = None;
     let mut attempt = 0u32;
     let mut decision_records: Vec<DecisionRecord> = Vec::new();
     let mut history: Vec<serde_json::Value> = Vec::new();
@@ -421,7 +424,17 @@ pub async fn submit_and_track(
 
         // Success: landed and executed cleanly (the ladder is already recorded).
         if let Some((slot, false)) = landing {
-            eprintln!("LANDED slot={slot}  https://solscan.io/tx/{sig}");
+            // Annotate with the leader that produced the landing slot.
+            let leader = rpc
+                .get_slot_leaders(slot, 1)
+                .await
+                .ok()
+                .and_then(|v| v.into_iter().next());
+            match &leader {
+                Some(l) => eprintln!("LANDED slot={slot} leader={l}  https://solscan.io/tx/{sig}"),
+                None => eprintln!("LANDED slot={slot}  https://solscan.io/tx/{sig}"),
+            }
+            leader_out = leader;
             landed = true;
             slot_out = Some(slot);
             break;
@@ -548,6 +561,7 @@ pub async fn submit_and_track(
         landed,
         signature,
         slot: slot_out,
+        leader: leader_out,
         attempts: attempt,
         trace_id,
         store,

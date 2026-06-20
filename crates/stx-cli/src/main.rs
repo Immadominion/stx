@@ -21,9 +21,10 @@ use stx_agent::{
     ReasoningAgent, ValidationContext,
 };
 use stx_core::{
-    spans_for_trace, AgentAction, Decision, DecisionParams, Lamports, LogicalTxId, TraceId,
+    spans_for_trace, AgentAction, Commitment, Decision, DecisionParams, Lamports, LogicalTxId,
+    TraceId,
 };
-use stx_jito::{JitoClient, TipFloorClient};
+use stx_jito::{leader_windows, JitoClient, SolanaRpc, TipFloorClient};
 
 #[derive(Parser)]
 #[command(name = "stx", version, about = "Smart Solana transaction control tower")]
@@ -51,6 +52,12 @@ enum Command {
     WatchSlots {
         #[arg(long, default_value_t = 10)]
         count: u32,
+    },
+    /// Show the upcoming leader schedule (validator per slot window) from the
+    /// RPC, grouped into 4-slot leader windows. Read-only.
+    Leaders {
+        #[arg(long, default_value_t = 16)]
+        count: u64,
     },
     /// Build, submit and track a real Jito bundle. Use --dry-run to build and
     /// simulate only. Reads RPC from .env.local and the keypair from wallet.json.
@@ -206,6 +213,36 @@ async fn main() -> Result<()> {
             }
             handle.abort();
         }
+        Command::Leaders { count } => {
+            let _ = dotenvy::from_filename(".env.local");
+            let rpc_url = std::env::var("SOLINFRA_RPC_URL")
+                .or_else(|_| std::env::var("HELIUS_RPC_ENDPOINT"))
+                .or_else(|_| std::env::var("RPC_URL"))
+                .map_err(|_| anyhow!("set SOLINFRA_RPC_URL or HELIUS_RPC_ENDPOINT in .env.local"))?;
+            let rpc = SolanaRpc::new(http.clone(), rpc_url);
+            let slot = rpc.get_slot(Commitment::Confirmed).await?;
+            let leaders = rpc.get_slot_leaders(slot, count).await?;
+            let windows = leader_windows(slot, &leaders);
+            println!(
+                "current slot {slot} - next {count} slots, {} leader windows:",
+                windows.len()
+            );
+            for w in &windows {
+                let here = if w.first_slot <= slot && slot <= w.last_slot {
+                    "  <- current"
+                } else {
+                    ""
+                };
+                println!(
+                    "  slots {}-{} ({} slots)  {}{}",
+                    w.first_slot,
+                    w.last_slot,
+                    w.slot_count(),
+                    w.leader,
+                    here
+                );
+            }
+        }
         Command::Submit {
             dry_run,
             keypair,
@@ -245,8 +282,8 @@ async fn main() -> Result<()> {
                 }
             }
             eprintln!(
-                "result: landed={} attempts={} sig={:?} slot={:?}",
-                outcome.landed, outcome.attempts, outcome.signature, outcome.slot
+                "result: landed={} attempts={} sig={:?} slot={:?} leader={:?}",
+                outcome.landed, outcome.attempts, outcome.signature, outcome.slot, outcome.leader
             );
 
             // The lifecycle log (a bounty deliverable) to stdout as JSON.
