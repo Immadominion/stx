@@ -29,6 +29,12 @@ export function TraceCard({ trace }: { trace: Trace }) {
             {trace.attemptCount === 1 ? "attempt" : "attempts"}
           </span>
           <span>{fmtDuration(trace.totalMs)}</span>
+          {trace.regions && trace.regions.length > 0 && (
+            <span title={trace.regions.join(", ")}>
+              {trace.regions.length}{" "}
+              {trace.regions.length === 1 ? "region" : "regions"}
+            </span>
+          )}
           <span className="text-ink-3">
             {trace.usedAgent ? "AI-steered" : "policy"}
           </span>

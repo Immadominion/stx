@@ -44,6 +44,8 @@ export interface Trace {
   landedSlot?: number;
   finalSignature?: string;
   headlineTip?: number;
+  /// Jito regions the landing attempt was fanned out to.
+  regions?: string[];
   startedAt: number;
   endedAt: number;
   totalMs: number;
@@ -78,6 +80,7 @@ export function buildTrace(events: Event[], decisions: DecisionRecord[]): Trace 
 
   const attempts: AttemptInfo[] = [];
   let cur: AttemptInfo | null = null;
+  let regions: string[] | undefined;
   for (const e of sorted) {
     switch (e.event.type) {
       case "tip_decided":
@@ -91,6 +94,9 @@ export function buildTrace(events: Event[], decisions: DecisionRecord[]): Trace 
         break;
       case "built":
         if (cur) cur.signature = e.event.signatures[0];
+        break;
+      case "dispatched":
+        regions = e.event.regions;
         break;
       case "landed":
         if (cur) {
@@ -166,6 +172,7 @@ export function buildTrace(events: Event[], decisions: DecisionRecord[]): Trace 
     finalSignature:
       landedAttempt?.signature ?? attempts[attempts.length - 1]?.signature,
     headlineTip: landedAttempt?.tip ?? attempts[attempts.length - 1]?.tip,
+    regions,
     startedAt: start,
     endedAt: ms(last.at),
     totalMs: ms(last.at) - start,
