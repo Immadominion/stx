@@ -32,8 +32,8 @@ use stx_core::{
 };
 use stx_ingestor::{run as ingestor_run, account_tx_request, IngestorConfig, Observation};
 use stx_jito::{
-    build_bundle, classify, recommend_tip, BundleParams, Congestion, FailureSignals, JitoClient,
-    SolanaRpc, TipFloorClient,
+    build_bundle, classify, recommend_tip, submit_to_regions, BundleParams, Congestion,
+    FailureSignals, JitoClient, SolanaRpc, TipFloorClient,
 };
 
 pub struct SubmitOptions {
@@ -68,6 +68,18 @@ fn default_floor() -> TipFloor {
         p99: Lamports(1_000_000),
         ema_p50: Lamports(10_000),
     }
+}
+
+/// Short region name from a Jito block-engine URL
+/// (`https://frankfurt.mainnet.block-engine.jito.wtf` -> `frankfurt`).
+fn region_label(url: &str) -> String {
+    url.strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+        .unwrap_or(url)
+        .split('.')
+        .next()
+        .unwrap_or(url)
+        .to_string()
 }
 
 /// Spawn a Yellowstone subscription on the fee `payer`'s non-vote transactions
@@ -387,14 +399,33 @@ pub async fn submit_and_track(
             &sig,
         );
 
-        let bundle_id = jito.send_bundle(&built.transactions).await?;
+        // Fan the bundle out to every configured region concurrently. Each region
+        // forwards to its own connected leaders, so this raises landing odds; the
+        // same signature can only land once, so there is no double-submit risk.
+        let region_refs: Vec<&str> = cfg.jito_regions.iter().map(|s| s.as_str()).collect();
+        let results = submit_to_regions(http, &region_refs, &built.transactions).await;
+        let accepted: Vec<String> = results
+            .iter()
+            .filter(|(_, r)| r.is_ok())
+            .map(|(url, _)| region_label(url))
+            .collect();
+        let bundle_id = results
+            .into_iter()
+            .find_map(|(_, r)| r.ok())
+            .ok_or_else(|| anyhow!("every region rejected the bundle"))?;
+        eprintln!(
+            "  dispatched to {}/{} regions: {}",
+            accepted.len(),
+            region_refs.len(),
+            accepted.join(", ")
+        );
         store.append(
             trace_id.clone(),
             ltx.clone(),
             None,
             LifecycleEvent::Dispatched {
                 bundle_id: bundle_id.clone(),
-                regions: vec![cfg.jito_base_url.clone()],
+                regions: accepted.clone(),
             },
         );
         store.append(trace_id.clone(), ltx.clone(), None, LifecycleEvent::MarkedInflight);

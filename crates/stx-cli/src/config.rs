@@ -8,6 +8,11 @@ use solana_sdk::signer::Signer;
 pub struct EngineConfig {
     pub rpc_url: String,
     pub jito_base_url: String,
+    /// Regional Jito endpoints the bundle is fanned out to on submit. Each region
+    /// has an independent per-IP rate budget and forwards to its own connected
+    /// leaders, so fanning out raises landing probability. The same signature can
+    /// only land once, so there is no double-submit risk.
+    pub jito_regions: Vec<String>,
     pub yellowstone_endpoint: Option<String>,
     pub yellowstone_x_token: Option<String>,
     pub keypair: Keypair,
@@ -34,6 +39,22 @@ impl EngineConfig {
             // different backend accepted). Frankfurt matches our infra region.
             jito_base_url: std::env::var("JITO_BLOCK_ENGINE_URL")
                 .unwrap_or_else(|_| "https://frankfurt.mainnet.block-engine.jito.wtf".to_string()),
+            // Default to all mainnet regions; override with a comma-separated
+            // JITO_REGIONS to narrow the fan-out.
+            jito_regions: std::env::var("JITO_REGIONS")
+                .ok()
+                .map(|s| {
+                    s.split(',')
+                        .map(|r| r.trim().to_string())
+                        .filter(|r| !r.is_empty())
+                        .collect()
+                })
+                .unwrap_or_else(|| {
+                    stx_jito::MAINNET_REGIONS
+                        .iter()
+                        .map(|s| s.to_string())
+                        .collect()
+                }),
             yellowstone_endpoint: std::env::var("SOLINFRA_GRPC_ENDPOINT").ok(),
             yellowstone_x_token: std::env::var("SOLINFRA_GRPC_X_TOKEN")
                 .or_else(|_| std::env::var("SOLINFRA_GRPC_SECRET"))
