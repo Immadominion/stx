@@ -91,6 +91,8 @@ A transaction is `processed` the instant the leader includes it. It is `confirme
 - Small and steady (roughly half a second to a second) means a healthy cluster: votes flowing fast, little fork contention.
 - Large or growing means the cluster is struggling. The usual culprits: fork contention (a `processed` transaction can sit on a minority fork until the supermajority votes through it), a high skip rate, or vote and replay lag under congestion.
 
+In the mainnet runs here the gap measured consistently around 0.63 to 0.66 seconds, with confirmed to finalized around 12 seconds (about 32 slots): a healthy cluster. stx records each stage with its real timestamp as the slot climbs the commitment ladder, so the delta is read straight off the trace ([`lifecycle-commitment-ladder.json`](docs/evidence/lifecycle-commitment-ladder.json)).
+
 ### 2. Why should you never fetch a blockhash at `finalized` for a time-sensitive transaction?
 
 **A finalized blockhash is already old, so it throws away most of the window the transaction has to land.**
@@ -116,6 +118,8 @@ These are observations from the real runs, not theory.
 - **Confirmation has to win the race against the landing.** My first runs double-submitted: I opened the signature subscription after submitting, so a sub-second landing was missed, and Jito's `getInflightBundleStatuses` reported `Invalid` for bundles that had actually landed. The fix was to subscribe before submitting and cross-check the authoritative RPC `getSignatureStatuses`. A confirmation false-negative is dangerous: it makes the retry loop resubmit a transaction that already landed.
 - **Jito's global endpoint mis-reports status.** The same bundle that the global endpoint called `Invalid` had landed on-chain. Using a regional endpoint (Frankfurt, matching the infra) keeps submit and status queries on the same backend.
 - **A median tip did not land.** On mainnet at the time, a p50 tip kept getting dropped; it took roughly p95 to land. The fallback now escalates the tip on a non-landing, and the agent, given the history of which tips already failed, escalates the same way and lands.
+- **A bare signature filter on the gRPC stream returned nothing.** The provider's geyser silently ignores a `signature`-only transaction filter, so landings were never confirmed from the stream. Filtering by the fee payer's account instead, and matching the exact signature in code, delivers them. I verified this with a [probe](crates/stx-ingestor/examples/watch_tx.rs) (2074 transactions in 6 seconds for a busy account) and a plain self-transfer the probe then caught.
+- **Fan-out earns its keep.** On one landing, two of the seven Jito regions rejected the submit that round, and the bundle still landed through the other five. Submitting the same bundle to every region costs nothing extra (one signature can only land once) and removes any single region as a point of failure.
 
 ---
 
