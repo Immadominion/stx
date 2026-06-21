@@ -1,32 +1,32 @@
 [
   {
-    "decision_id": "dec_51a1fe686f5841f5b8920320ec49ef5b",
-    "trace_id": "trc_f5c5f6eeebd949b890e40095da2ec641",
-    "logical_tx_id": "ltx_d525c2f9d3684177af1af351d65465b0",
+    "decision_id": "dec_e8a1f0698ba94b7fa3bb4f6efd2e148f",
+    "trace_id": "trc_04e0f3c172fa43268d7002b978d95eea",
+    "logical_tx_id": "ltx_d4ebba744d4b47ed9014e603d75ec680",
     "attempt": 1,
-    "at": "2026-06-07T09:06:07.260063Z",
+    "at": "2026-06-21T00:18:59.874057Z",
     "trigger": "tx_failed",
     "observations": {
-      "blockhash_age_blocks": 60,
+      "blockhash_age_blocks": 35,
       "classified_kind": "Dropped",
       "cu_requested": 10000,
       "error": "not confirmed within timeout",
       "landed": false,
-      "tip_floor_p50": 1484,
-      "tip_paid_lamports": 1484
+      "tip_floor_p50": 1823,
+      "tip_paid_lamports": 1823
     },
-    "thinking_summary": "I'll diagnose this. The surface error is \"Dropped/not confirmed\" but I need to find the root cause. Let me gather evidence.\nKey observations:\n- **Blockhash age = 60 blocks** \u2014 Solana blockhashes expire at ~150 blocks, so at 60 it's aging but not necessarily expired. This is borderline worth a refresh.\n- **CU requested 10000, never landed** \u2014 no evidence of compute exhaustion (we'd need cu_consumed ~ cu_requested; the tx never landed so it didn't execute).\n- **Tip = 1484 = exactly p50** \u2014 only at the median. p75 is 11087, a huge jump. Tip is at floor, not below it.\n- **Never landed (Dropped)** \u2014 consistent with fee starvation under competition, where p50 isn't enough.\n\nThe tip is AT p50, not below floor. But p75 (11087) is ~7x higher, suggesting real competition where p50 is insufficient to land reliably. Let me test hypotheses before committing \u2014 test whether refreshing blockhash alone helps vs raising the tip.\nImportant new data: **cu_consumed = 450** against a requested 10000 \u2014 so CU is wildly over-provisioned, definitely not compute exhaustion. The simulation succeeds at the SAME p50 tip (1484) as long as the blockhash is refreshed. The higher tip (11087) is not needed \u2014 it succeeds at 1484 too.\n\nThis points to **blockhash staleness** as the root cause, not fee starvation. At 60 blocks aged, the original blockhash was drifting toward expiry by the time the bundle competed for inclusion, and the tx dropped. A refresh fixes it with NO tip change \u2014 exactly the \"blockhash expiry \u2192 refresh, no tip change\" pattern. The market is healthy (no program/slippage error in sim, err=null).",
+    "thinking_summary": "I'll diagnose this systematically. Let me gather evidence from multiple sources.\nKey observations:\n- **Blockhash age: 35 blocks** \u2014 blockhashes expire at ~150 blocks, so this is NOT expired. Refresh alone won't help.\n- **landed: false, classified \"Dropped\"** \u2014 never landed.\n- **tip_paid = 1823 = exactly p50**, but the **EMA p50 is 3794** (more than double the static p50), and p75 = 4045. This signals the tip floor is rising; paying exactly p50 is borderline/insufficient \u2014 classic fee starvation.\n- **CU not exhausted** (consumed isn't even reported as near-limit; this is a drop, not a compute failure).\n\nThis looks like **fee starvation**: tip at p50 (1823) while EMA has drifted to 3794. Let me test the hypothesis before committing.\nThe simulation confirms the transaction itself is valid (no program/market error, CU consumed only 450 vs 10000 requested \u2014 definitely not compute exhaustion). The drop is purely a landing/inclusion problem, consistent with fee starvation.\n\nLet me confirm the diagnosis pieces:\n- **Not blockhash expiry**: age 35 << 150 expiry threshold.\n- **Not compute exhaustion**: CU consumed 450 << 10000 requested.\n- **Not adverse-market/program error**: sim returns ok, err null.\n- **Fee starvation**: tip paid exactly p50 (1823) while EMA p50 has drifted up to 3794 and p75 is 4045 \u2014 the floor is rising and p50 is no longer competitive enough to land.\n\nRemedy: raise the tip toward a higher percentile (p75 = 4045, which is also near the EMA of 3794).",
     "tool_calls": [
       {
         "input": {},
         "result": {
-          "blockhash_age_blocks": 60,
+          "blockhash_age_blocks": 35,
           "classified_kind": "Dropped",
           "cu_requested": 10000,
           "error": "not confirmed within timeout",
           "landed": false,
-          "tip_floor_p50": 1484,
-          "tip_paid_lamports": 1484
+          "tip_floor_p50": 1823,
+          "tip_paid_lamports": 1823
         },
         "tool": "get_failure_context"
       },
@@ -41,12 +41,12 @@
       {
         "input": {},
         "result": {
-          "ema_p50": 1468,
-          "p25": 1001,
-          "p50": 1484,
-          "p75": 11087,
-          "p95": 100000,
-          "p99": 319529
+          "ema_p50": 3794,
+          "p25": 1034,
+          "p50": 1823,
+          "p75": 4045,
+          "p95": 96837,
+          "p99": 290072
         },
         "tool": "get_tip_floor"
       },
@@ -55,14 +55,14 @@
         "result": {
           "current_attempt": 1,
           "current_cu_limit": 10000,
-          "current_tip_lamports": 1484,
+          "current_tip_lamports": 1823,
           "prior_attempts": [
             {
               "attempt": 1,
               "classified": "Dropped",
               "cu_limit": 10000,
               "outcome": "not_landed",
-              "tip_lamports": 1484
+              "tip_lamports": 1823
             }
           ]
         },
@@ -71,8 +71,8 @@
       {
         "input": {
           "cu_limit": 10000,
-          "refresh_blockhash": true,
-          "tip_lamports": 1484
+          "refresh_blockhash": false,
+          "tip_lamports": 1823
         },
         "result": {
           "cu_consumed": 450,
@@ -84,8 +84,8 @@
       {
         "input": {
           "cu_limit": 10000,
-          "refresh_blockhash": true,
-          "tip_lamports": 11087
+          "refresh_blockhash": false,
+          "tip_lamports": 4045
         },
         "result": {
           "cu_consumed": 450,
@@ -96,62 +96,61 @@
       }
     ],
     "decision": {
-      "action": "resubmit",
+      "action": "raise_tip",
       "params": {
-        "tip_lamports": 1484,
+        "tip_lamports": 4045,
         "cu_limit": null,
         "refresh_blockhash": false
       },
       "hypotheses": [
-        "Blockhash staleness/expiry (age 60 blocks) caused the drop before inclusion",
-        "Fee starvation: tip at p50 too low under competition",
-        "Compute exhaustion: CU limit too low"
+        "Fee starvation: tip at p50 (1823) below rising floor (EMA p50 3794, p75 4045), tx never landed",
+        "Blockhash expiry: ruled out, age 35 << 150",
+        "Compute exhaustion: ruled out, CU consumed 450 << 10000 requested",
+        "Adverse-market/program error: ruled out, simulation returns ok/err=null"
       ],
-      "chosen_cause": "Blockhash staleness \u2014 the tx was dropped due to an aging blockhash (60 blocks), not fee or compute issues.",
-      "justification": "cu_consumed in simulation was only 450 vs cu_requested 10000, ruling out compute exhaustion. Simulation with a refreshed blockhash SUCCEEDED (ok=true, err=null) at the unchanged p50 tip of 1484 \u2014 and raising the tip to p75 (11087) gave no additional benefit (also ok=true), ruling out fee starvation. err=null in sim rules out an adverse-market/program error. The remaining differentiator was blockhash_age_blocks=60; refreshing the blockhash resolves the Dropped/'not confirmed within timeout' outcome. Therefore refresh blockhash and hold the tip at the p50 floor (1484).",
-      "confidence": 0.88,
-      "expected_effect": "With a fresh blockhash the tx has a full validity window to land; at the unchanged p50 tip (1484) the bundle should confirm, as shown by the successful simulation. No extra tip or CU spend incurred."
+      "chosen_cause": "Fee starvation \u2014 tip below the effective (rising) tip floor caused the bundle to be dropped without landing",
+      "justification": "landed=false and classified_kind=Dropped indicate a pure inclusion failure, not a validity failure. Blockhash age is 35 blocks, well under the ~150 expiry, so refresh is unnecessary. CU consumed in simulation is 450 vs 10000 requested, ruling out compute exhaustion. Simulation returns ok with err=null, ruling out adverse-market/program error. The tip paid (1823) equals the static p50 exactly, but the EMA p50 has drifted up to 3794 and p75 is 4045 \u2014 the floor is rising and p50 is no longer competitive. Sim at 4045 also succeeds. Therefore raise the tip toward p75/EMA.",
+      "confidence": 0.82,
+      "expected_effect": "Tip of 4045 (~p75, above the EMA of 3794) makes the bundle competitive against the rising floor so it gets included this slot. CU limit and blockhash left unchanged since neither is the cause."
     },
     "guardrail": {
       "tip_clamped": false,
       "action_allowed": true,
-      "overrides": [
-        "requested blockhash refresh but blockhash is not expired; downgraded to Resubmit"
-      ],
+      "overrides": [],
       "fell_back_to_default": false
     },
     "outcome": null,
     "model": "claude-opus-4-8",
-    "request_id": "req_011CbodgY4yjRmFgXikiAX5j"
+    "request_id": "req_011CcFSouCjYkQwuymJYNtLB"
   },
   {
-    "decision_id": "dec_ef6e268fec4b44c883f649c7895d6866",
-    "trace_id": "trc_f5c5f6eeebd949b890e40095da2ec641",
-    "logical_tx_id": "ltx_d525c2f9d3684177af1af351d65465b0",
+    "decision_id": "dec_dcc3ea7a87864632965f08cdc066cab2",
+    "trace_id": "trc_04e0f3c172fa43268d7002b978d95eea",
+    "logical_tx_id": "ltx_d4ebba744d4b47ed9014e603d75ec680",
     "attempt": 2,
-    "at": "2026-06-07T09:06:53.561973Z",
+    "at": "2026-06-21T00:19:35.706697Z",
     "trigger": "tx_failed",
     "observations": {
-      "blockhash_age_blocks": 60,
+      "blockhash_age_blocks": 33,
       "classified_kind": "Dropped",
       "cu_requested": 10000,
       "error": "not confirmed within timeout",
       "landed": false,
-      "tip_floor_p50": 1484,
-      "tip_paid_lamports": 1484
+      "tip_floor_p50": 1823,
+      "tip_paid_lamports": 4045
     },
-    "thinking_summary": "I'll diagnose this failure. The surface error is \"Dropped/not confirmed within timeout\" which could be blockhash expiry, fee starvation, or compute issues. Let me gather evidence.\nKey evidence:\n- **blockhash_age_blocks: 60** \u2014 Solana blockhashes expire at ~150 blocks, so at 60 the blockhash is still valid. Not a expiry issue.\n- **landed: false** across 2 attempts, both at tip = 1484 = exactly p50.\n- Tip floor p50 is 1484 but **p75 = 11087** \u2014 there's a large gap. Sitting at p50 isn't competitive; the tx never landed twice in a row.\n- CU is not the issue (requested 10000, no compute exhaustion signal, and it never landed at all \u2014 CU exhaustion would land+fail).\n\nThis looks like **fee starvation**: never landed, tip stuck at p50 floor while the distribution skews high (p75 is ~7.5x p50). Let me test raising the tip toward p75.\nThe simulations confirm the diagnosis:\n- Raising tip to p75 (11087) \u2192 **ok: true**. \n- Just refreshing blockhash at the same tip \u2192 also ok in sim, but simulation doesn't model the competitive landing/inclusion auction \u2014 and the real failures are repeated non-landings, not expiry (blockhash age 60 < 150).\n- **cu_consumed: 450** vs requested 10000 \u2192 CU is vastly over-provisioned, so compute exhaustion is definitively ruled out. No CU change needed.\n\nThe root cause is fee starvation: tip pinned at p50 (1484) never landed across 2 attempts while the tip distribution skews heavily upward (p75 = 11087, ~7.5x p50). The remedy is raising the tip toward a higher percentile.",
+    "thinking_summary": "I'll diagnose this systematically. Let me gather evidence from multiple sources.\nLet me analyze the evidence:\n\n- **Blockhash age: 33 blocks** \u2014 still well within the ~150 block validity window, so NOT a blockhash expiry issue.\n- **CU requested 10000, landed=false** \u2014 never landed, so we can't compare CU consumed vs requested for exhaustion. But 10000 CU is tiny; no exhaustion error signal.\n- **Tip history**: attempt 1 paid 1823 (=p50) \u2192 dropped. Attempt 2 paid 4045 (=p75) \u2192 dropped. Both never landed.\n- **Tip floor**: p50=1823, p75=4045, p95=96837, EMA=3794. Current tip (4045) is at p75 but below the EMA-adjusted competitive level and far below p95.\n\nThis looks like **fee starvation**: the bundle never lands, and escalating from p50\u2192p75 didn't help. The EMA (3794) sitting above p50 suggests the floor is rising. I need to test a higher tip toward a higher percentile.\n\nLet me simulate hypotheses before committing.\nImportant findings from simulation:\n- **CU consumed: 450** vs requested 10000 \u2014 massive headroom. This is definitively NOT compute exhaustion. CU is fine.\n- Simulation succeeds (ok=true, err=null) \u2014 so this is NOT an adverse-market/program error. The transaction is valid and would execute cleanly if it lands.\n\nThe problem is purely a **landing/inclusion** problem. The tx is valid (sim ok), CU is generous, blockhash is fresh (33 blocks). It simply never gets included despite two attempts. This is classic **fee starvation** \u2014 the tip needs to escalate toward a higher percentile.\n\nAttempt 1 (p50=1823) and attempt 2 (p75=4045) both failed to land. The EMA (3794) confirms the effective floor is above p50. The next meaningful escalation step is toward p95 (96837), since p75 already failed. I'll commit to raising the tip.",
     "tool_calls": [
       {
         "input": {},
         "result": {
-          "blockhash_age_blocks": 60,
+          "blockhash_age_blocks": 33,
           "classified_kind": "Dropped",
           "cu_requested": 10000,
           "error": "not confirmed within timeout",
           "landed": false,
-          "tip_floor_p50": 1484,
-          "tip_paid_lamports": 1484
+          "tip_floor_p50": 1823,
+          "tip_paid_lamports": 4045
         },
         "tool": "get_failure_context"
       },
@@ -166,12 +165,12 @@
       {
         "input": {},
         "result": {
-          "ema_p50": 1468,
-          "p25": 1001,
-          "p50": 1484,
-          "p75": 11087,
-          "p95": 100000,
-          "p99": 319529
+          "ema_p50": 3794,
+          "p25": 1034,
+          "p50": 1823,
+          "p75": 4045,
+          "p95": 96837,
+          "p99": 290072
         },
         "tool": "get_tip_floor"
       },
@@ -180,21 +179,21 @@
         "result": {
           "current_attempt": 2,
           "current_cu_limit": 10000,
-          "current_tip_lamports": 1484,
+          "current_tip_lamports": 4045,
           "prior_attempts": [
             {
               "attempt": 1,
               "classified": "Dropped",
               "cu_limit": 10000,
               "outcome": "not_landed",
-              "tip_lamports": 1484
+              "tip_lamports": 1823
             },
             {
               "attempt": 2,
               "classified": "Dropped",
               "cu_limit": 10000,
               "outcome": "not_landed",
-              "tip_lamports": 1484
+              "tip_lamports": 4045
             }
           ]
         },
@@ -204,7 +203,7 @@
         "input": {
           "cu_limit": 10000,
           "refresh_blockhash": false,
-          "tip_lamports": 11087
+          "tip_lamports": 4045
         },
         "result": {
           "cu_consumed": 450,
@@ -216,8 +215,8 @@
       {
         "input": {
           "cu_limit": 10000,
-          "refresh_blockhash": true,
-          "tip_lamports": 1484
+          "refresh_blockhash": false,
+          "tip_lamports": 96837
         },
         "result": {
           "cu_consumed": 450,
@@ -230,158 +229,20 @@
     "decision": {
       "action": "raise_tip",
       "params": {
-        "tip_lamports": 11087,
-        "cu_limit": 10000,
-        "refresh_blockhash": false
-      },
-      "hypotheses": [
-        "Fee starvation: tip at p50 never competitive, bundle never landed across attempts",
-        "Blockhash expiry: ruled out, age=60 < 150 expiry threshold",
-        "Compute exhaustion: ruled out, cu_consumed=450 vs requested=10000",
-        "Adverse-market/program error: ruled out, simulation returns ok with err=null"
-      ],
-      "chosen_cause": "Fee starvation \u2014 tip pinned at p50 floor was never competitive enough to land",
-      "justification": "landed=false across 2 prior attempts both at tip_paid=1484, which equals tip_floor p50 exactly. The tip distribution skews sharply upward (p50=1484 but p75=11087, ~7.5x), so sitting at p50 is uncompetitive and the bundle never landed. Blockhash expiry is ruled out: blockhash_age_blocks=60 is well below the ~150 expiry threshold. Compute exhaustion is ruled out: simulation shows cu_consumed=450 vs cu_requested=10000 (huge headroom), and the tx never landed at all. Program/market error is ruled out: simulate_with_params returns ok=true, err=null. Simulating at tip=11087 (p75) returns ok=true. Raising tip toward p75 addresses the actual inclusion-auction starvation.",
-      "confidence": 0.82,
-      "expected_effect": "Bundle becomes competitive in the Jito tip auction (tip at p75=11087 vs prior p50=1484) and lands; no blockhash refresh or CU change needed since neither is the cause."
-    },
-    "guardrail": {
-      "tip_clamped": false,
-      "action_allowed": true,
-      "overrides": [],
-      "fell_back_to_default": false
-    },
-    "outcome": null,
-    "model": "claude-opus-4-8",
-    "request_id": "req_011CbodjtFFbNmA1Yhg8kZNr"
-  },
-  {
-    "decision_id": "dec_49a53646933848cfb5afef7f42531022",
-    "trace_id": "trc_f5c5f6eeebd949b890e40095da2ec641",
-    "logical_tx_id": "ltx_d525c2f9d3684177af1af351d65465b0",
-    "attempt": 3,
-    "at": "2026-06-07T09:07:39.544003Z",
-    "trigger": "tx_failed",
-    "observations": {
-      "blockhash_age_blocks": 59,
-      "classified_kind": "Dropped",
-      "cu_requested": 10000,
-      "error": "not confirmed within timeout",
-      "landed": false,
-      "tip_floor_p50": 1484,
-      "tip_paid_lamports": 11087
-    },
-    "thinking_summary": "I'll diagnose this systematically. Let me gather evidence from multiple sources.\nKey observations:\n- **Blockhash age = 59 blocks** \u2014 this is at/over the ~150 block limit's danger zone? Actually 59 is well under 150, so blockhash is still valid. Not an expiry issue.\n- **Never landed** across 3 attempts (Dropped each time). Classic fee starvation signature.\n- **CU**: requested 10000, never landed so no CU-consumed signal. Not compute exhaustion (a tiny 10k limit but tx never executed).\n- **Tip history**: attempts 1 & 2 paid 1484 (= p50), attempt 3 raised to 11087 (= p75) and STILL didn't land.\n- Current tip floor: p75=11087, p95=100000. The tip paid equals p75 exactly and still failed.\n\nThe tip is at p75 and still not landing \u2014 I need to test a higher percentile. Let me simulate raising toward p95.\nImportant: at p95 (100000) it succeeds. But the control sim at p75 (11087) also \"succeeds\" \u2014 simulation doesn't model the landing/inclusion competition, it only validates execution. Note **cu_consumed=450** vs requested 10000 \u2014 so this is definitively NOT compute exhaustion (uses 4.5% of the limit).\n\nEvidence synthesis:\n- Execution is valid (sim ok, no program error) \u2192 **not** an adverse-market/program abort.\n- CU consumed 450 \u226a 10000 \u2192 **not** compute exhaustion.\n- Blockhash age 59 < 150 \u2192 still valid, **not** expiry.\n- Never landed in 3 attempts; tip escalated 1484\u21921484\u219211087 (p50\u2192p50\u2192p75) and each was Dropped \u2192 **fee starvation**. The p75 tip (11087) already failed to land, so I must move toward p95.",
-    "tool_calls": [
-      {
-        "input": {},
-        "result": {
-          "blockhash_age_blocks": 59,
-          "classified_kind": "Dropped",
-          "cu_requested": 10000,
-          "error": "not confirmed within timeout",
-          "landed": false,
-          "tip_floor_p50": 1484,
-          "tip_paid_lamports": 11087
-        },
-        "tool": "get_failure_context"
-      },
-      {
-        "input": {},
-        "result": {
-          "recent_priority_fee_p50_microlamports": 0,
-          "samples": 150
-        },
-        "tool": "get_network_conditions"
-      },
-      {
-        "input": {},
-        "result": {
-          "ema_p50": 1468,
-          "p25": 1001,
-          "p50": 1484,
-          "p75": 11087,
-          "p95": 100000,
-          "p99": 319529
-        },
-        "tool": "get_tip_floor"
-      },
-      {
-        "input": {},
-        "result": {
-          "current_attempt": 3,
-          "current_cu_limit": 10000,
-          "current_tip_lamports": 11087,
-          "prior_attempts": [
-            {
-              "attempt": 1,
-              "classified": "Dropped",
-              "cu_limit": 10000,
-              "outcome": "not_landed",
-              "tip_lamports": 1484
-            },
-            {
-              "attempt": 2,
-              "classified": "Dropped",
-              "cu_limit": 10000,
-              "outcome": "not_landed",
-              "tip_lamports": 1484
-            },
-            {
-              "attempt": 3,
-              "classified": "Dropped",
-              "cu_limit": 10000,
-              "outcome": "not_landed",
-              "tip_lamports": 11087
-            }
-          ]
-        },
-        "tool": "get_retry_history"
-      },
-      {
-        "input": {
-          "cu_limit": 10000,
-          "refresh_blockhash": false,
-          "tip_lamports": 100000
-        },
-        "result": {
-          "cu_consumed": 450,
-          "err": null,
-          "ok": true
-        },
-        "tool": "simulate_with_params"
-      },
-      {
-        "input": {
-          "cu_limit": 10000,
-          "refresh_blockhash": false,
-          "tip_lamports": 11087
-        },
-        "result": {
-          "cu_consumed": 450,
-          "err": null,
-          "ok": true
-        },
-        "tool": "simulate_with_params"
-      }
-    ],
-    "decision": {
-      "action": "raise_tip",
-      "params": {
-        "tip_lamports": 100000,
+        "tip_lamports": 96837,
         "cu_limit": null,
         "refresh_blockhash": false
       },
       "hypotheses": [
-        "Fee starvation: tip below the effective landing floor under congestion",
-        "Blockhash expiry needing refresh",
-        "Compute exhaustion needing higher CU limit",
-        "Adverse-market/program error requiring abort"
+        "Fee starvation: never landed, tip at p75 below competitive floor and far below p95",
+        "Compute exhaustion: ruled out (cu_consumed=450 vs 10000 requested)",
+        "Blockhash expiry: ruled out (age 33 blocks, within ~150 validity window)",
+        "Adverse-market/program error: ruled out (simulation ok=true, err=null)"
       ],
-      "chosen_cause": "Fee starvation \u2014 repeatedly Dropped/never-landed with tips that were too low for inclusion",
-      "justification": "landed=false across all 3 prior attempts (all classified Dropped). Tip escalated 1484(p50)\u21921484(p50)\u219211087(p75) and still never landed, so even p75 is below the effective landing floor right now. Blockhash_age=59 blocks is well under the ~150 expiry limit, so refresh is not needed. Simulation shows cu_consumed=450 against cu_requested=10000 (4.5%), ruling out compute exhaustion. Sim returned ok=true with err=null, ruling out an adverse-market/program error (no abort). Remaining cause is fee starvation; tip-floor p95=100000, so I raise the tip to p95 to clear the inclusion threshold.",
+      "chosen_cause": "Fee starvation \u2014 bundle repeatedly dropped because tip is below the effective inclusion floor",
+      "justification": "Two prior attempts never landed: attempt 1 paid 1823 (=p50) and attempt 2 paid 4045 (=p75), both classified Dropped/not_landed. Blockhash age is only 33 blocks (well within validity), so no refresh needed. Simulation shows cu_consumed=450 against cu_requested=10000, so compute exhaustion is impossible. Simulation returned ok=true/err=null, so this is not an adverse-market or program error \u2014 the tx is valid and would execute if included. The tip-floor EMA (3794) sits above p50, confirming a rising floor, and p75 has already failed to land. Escalating toward p95 (96837) is the appropriate remedy for inclusion failure.",
       "confidence": 0.82,
-      "expected_effect": "Tip at p95 (100000 lamports) should clear the current inclusion floor and let the bundle land; blockhash stays valid so no refresh needed."
+      "expected_effect": "A tip at the p95 level should clear the competitive inclusion floor and get the bundle landed; CU and blockhash remain unchanged since they are not the bottleneck."
     },
     "guardrail": {
       "tip_clamped": false,
@@ -391,6 +252,6 @@
     },
     "outcome": null,
     "model": "claude-opus-4-8",
-    "request_id": "req_011CbodoHvsR44oJbZcXudNQ"
+    "request_id": "req_011CcFSrUr6vHc2v1VtjFDVn"
   }
 ]

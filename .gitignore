@@ -24,7 +24,7 @@ wallet*.json
 context.txt
 
 # Scratch run logs (curated evidence lives under docs/ when ready)
-runs/
+/runs/
 
 # OS / editor
 .DS_Store

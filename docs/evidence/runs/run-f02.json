@@ -1,0 +1,96 @@
+[
+  {
+    "seq": 0,
+    "at": "2026-06-21T00:17:02.642385Z",
+    "trace_id": "trc_e8370dae671241b2abfb50c56a86f06a",
+    "logical_tx_id": "ltx_c2273cf48d6b4e25bd684cb042c4d3cb",
+    "slot": null,
+    "event": {
+      "type": "drafted",
+      "logical_tx_id": "ltx_c2273cf48d6b4e25bd684cb042c4d3cb"
+    }
+  },
+  {
+    "seq": 1,
+    "at": "2026-06-21T00:17:03.563217Z",
+    "trace_id": "trc_e8370dae671241b2abfb50c56a86f06a",
+    "logical_tx_id": "ltx_c2273cf48d6b4e25bd684cb042c4d3cb",
+    "slot": null,
+    "event": {
+      "type": "tip_decided",
+      "tip_lamports": 3519,
+      "source": "static_policy"
+    }
+  },
+  {
+    "seq": 2,
+    "at": "2026-06-21T00:17:03.563861Z",
+    "trace_id": "trc_e8370dae671241b2abfb50c56a86f06a",
+    "logical_tx_id": "ltx_c2273cf48d6b4e25bd684cb042c4d3cb",
+    "slot": null,
+    "event": {
+      "type": "built",
+      "signatures": [
+        "39PYF59NkcmcU9pyC3bvofyYXfT5p7DysdxcojA8LrALnQHLQwcAGhN2FbrH2Rzq4yxLJXXyodUMeFv6yKJSbgGf"
+      ]
+    }
+  },
+  {
+    "seq": 3,
+    "at": "2026-06-21T00:17:04.618900Z",
+    "trace_id": "trc_e8370dae671241b2abfb50c56a86f06a",
+    "logical_tx_id": "ltx_c2273cf48d6b4e25bd684cb042c4d3cb",
+    "slot": null,
+    "event": {
+      "type": "dispatched",
+      "bundle_id": "9bb2ed5026e787a850d7382065ce996ca3b4e6f822ef66f989feb067728ccf84",
+      "regions": [
+        "amsterdam",
+        "frankfurt",
+        "london",
+        "ny",
+        "slc",
+        "singapore",
+        "tokyo"
+      ]
+    }
+  },
+  {
+    "seq": 4,
+    "at": "2026-06-21T00:17:04.618905Z",
+    "trace_id": "trc_e8370dae671241b2abfb50c56a86f06a",
+    "logical_tx_id": "ltx_c2273cf48d6b4e25bd684cb042c4d3cb",
+    "slot": null,
+    "event": {
+      "type": "marked_inflight"
+    }
+  },
+  {
+    "seq": 5,
+    "at": "2026-06-21T00:17:12.921335Z",
+    "trace_id": "trc_e8370dae671241b2abfb50c56a86f06a",
+    "logical_tx_id": "ltx_c2273cf48d6b4e25bd684cb042c4d3cb",
+    "slot": null,
+    "event": {
+      "type": "failed",
+      "class": {
+        "kind": "dropped",
+        "evidence": "never landed and no specific signal; treated as dropped",
+        "confidence": 0.5,
+        "raw_error": null,
+        "at_slot": null
+      }
+    }
+  },
+  {
+    "seq": 6,
+    "at": "2026-06-21T00:17:12.921974Z",
+    "trace_id": "trc_e8370dae671241b2abfb50c56a86f06a",
+    "logical_tx_id": "ltx_c2273cf48d6b4e25bd684cb042c4d3cb",
+    "slot": null,
+    "event": {
+      "type": "aborted",
+      "reason": "max attempts reached"
+    }
+  }
+]

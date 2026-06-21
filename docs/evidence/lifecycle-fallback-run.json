@@ -1,59 +1,65 @@
 [
   {
     "seq": 0,
-    "at": "2026-06-06T23:34:49.832008Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:08.894622Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "drafted",
-      "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f"
+      "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26"
     }
   },
   {
     "seq": 1,
-    "at": "2026-06-06T23:34:51.605793Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:10.122783Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "tip_decided",
-      "tip_lamports": 1509,
+      "tip_lamports": 1885,
       "source": "static_policy"
     }
   },
   {
     "seq": 2,
-    "at": "2026-06-06T23:34:51.606286Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:10.123251Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "built",
       "signatures": [
-        "43GCV9ovs87N6vK9N6v2bhHXum4rytysFTvaQqzC4m1PYPaWwsTAdFH9MaATyLk2oNKg6ySnLRun2uhf2oHUcihB"
+        "8gUnByfzEJjt3GnKCcBgojabsedcfFPLbFqt7Nsxk2VyQ6bC1oQQvinX3zkxSQJuPQohB2REajgwng9vw8E9bNG"
       ]
     }
   },
   {
     "seq": 3,
-    "at": "2026-06-06T23:34:51.768342Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:11.633985Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "dispatched",
-      "bundle_id": "554f03c632c5426d832b4aeba804a0ccc957ca1b6910e461c576feb892ce0b19",
+      "bundle_id": "183d70db8482dceaa79b965e9947a852080302dfbdd4822d2e0638d5272ff17d",
       "regions": [
-        "https://frankfurt.mainnet.block-engine.jito.wtf"
+        "amsterdam",
+        "frankfurt",
+        "london",
+        "ny",
+        "slc",
+        "singapore",
+        "tokyo"
       ]
     }
   },
   {
     "seq": 4,
-    "at": "2026-06-06T23:34:51.768345Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:11.633991Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "marked_inflight"
@@ -61,9 +67,9 @@
   },
   {
     "seq": 5,
-    "at": "2026-06-06T23:35:23.061649Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:56.939936Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "failed",
@@ -78,60 +84,66 @@
   },
   {
     "seq": 6,
-    "at": "2026-06-06T23:35:23.062237Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:56.940261Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "retry_scheduled",
-      "child_trace": "trc_81f342ebf15f4a46a5611d98717432b6",
+      "child_trace": "trc_b4a2f8acc6b7418cbfcc813c9ef3f6b6",
       "attempt": 2
     }
   },
   {
     "seq": 7,
-    "at": "2026-06-06T23:35:23.282819Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:57.087331Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "tip_decided",
-      "tip_lamports": 5666,
+      "tip_lamports": 10000,
       "source": "static_policy"
     }
   },
   {
     "seq": 8,
-    "at": "2026-06-06T23:35:23.283117Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:57.087817Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "built",
       "signatures": [
-        "jVwg6zUVJqEDn6ckR4CJjeCfj8hty8pRkhAoxMs648mgQ74acfNeJAaGmKZhhFBdshWn4163k7z1x4Qt5sSimPZ"
+        "5JndV4GGuHQti8kMMSK42xqa8JhxSaL95YfwWok31V3Fm2CniJa7CAiDxUGKn2EAthrKbEEfqggDjriuS43CXmqK"
       ]
     }
   },
   {
     "seq": 9,
-    "at": "2026-06-06T23:35:23.470Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:57.436177Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "dispatched",
-      "bundle_id": "dc87839d9a16055507703862fcae945b38bdd3e7c60e188e7d3c1535de7b3d55",
+      "bundle_id": "ea90ffec28acca3cd23b16634ee6f2cf39dc14e1970e88489c3db4fb1ecf72f4",
       "regions": [
-        "https://frankfurt.mainnet.block-engine.jito.wtf"
+        "amsterdam",
+        "frankfurt",
+        "london",
+        "ny",
+        "slc",
+        "singapore",
+        "tokyo"
       ]
     }
   },
   {
     "seq": 10,
-    "at": "2026-06-06T23:35:23.470002Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:02:57.436180Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "marked_inflight"
@@ -139,9 +151,9 @@
   },
   {
     "seq": 11,
-    "at": "2026-06-06T23:35:54.640762Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:03:42.721105Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "failed",
@@ -156,21 +168,21 @@
   },
   {
     "seq": 12,
-    "at": "2026-06-06T23:35:54.641449Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:03:42.721393Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "retry_scheduled",
-      "child_trace": "trc_3d6831c544434fcb9138ceeb6116fbf3",
+      "child_trace": "trc_12040cfbd6f842698cf8b71beb1c88b8",
       "attempt": 3
     }
   },
   {
     "seq": 13,
-    "at": "2026-06-06T23:35:54.801242Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:03:42.861931Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "tip_decided",
@@ -180,36 +192,40 @@
   },
   {
     "seq": 14,
-    "at": "2026-06-06T23:35:54.802468Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:03:42.862265Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "built",
       "signatures": [
-        "22ySyfKac78WGJudeUPy7Jt4x52G8YwVTPhLCHKTbe2kJVA6YHauFwuAAEjUCoue5yg9SERAVsRMzS7QkVUQgCon"
+        "37wjkkQj6Nn5jckifgWx5XyQiVZ19NKCo5dnwSpJVhh4FvsT8h7safzYXqA49djxCCDiCwEBLYHkYE2N4zJHBm9Q"
       ]
     }
   },
   {
     "seq": 15,
-    "at": "2026-06-06T23:35:54.968895Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:03:43.546235Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "dispatched",
-      "bundle_id": "f21ca03ff2ffc2f99b8d1d39d5a07710424f073d3024088dc0b342f0cdd8495d",
+      "bundle_id": "b8e3bcd3bde2c95938776a4e4f15dbc2e8991e4b57f4a4498fc82e3060f368f4",
       "regions": [
-        "https://frankfurt.mainnet.block-engine.jito.wtf"
+        "london",
+        "ny",
+        "slc",
+        "singapore",
+        "tokyo"
       ]
     }
   },
   {
     "seq": 16,
-    "at": "2026-06-06T23:35:54.968898Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
+    "at": "2026-06-21T00:03:43.546240Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
     "slot": null,
     "event": {
       "type": "marked_inflight"
@@ -217,25 +233,37 @@
   },
   {
     "seq": 17,
-    "at": "2026-06-06T23:35:56.772331Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
-    "slot": 424777434,
+    "at": "2026-06-21T00:03:43.688759Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
+    "slot": 427828765,
     "event": {
       "type": "landed",
-      "slot": 424777434
+      "slot": 427828765
     }
   },
   {
     "seq": 18,
-    "at": "2026-06-06T23:35:56.772333Z",
-    "trace_id": "trc_2ee179758ca14d37979f4d570cb34944",
-    "logical_tx_id": "ltx_43ced3973c2b4bd9821af395ab3f4f4f",
-    "slot": 424777434,
+    "at": "2026-06-21T00:03:44.320626Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
+    "slot": 427828765,
     "event": {
       "type": "commitment_reached",
       "commitment": "confirmed",
-      "slot": 424777434
+      "slot": 427828765
+    }
+  },
+  {
+    "seq": 19,
+    "at": "2026-06-21T00:03:56.540327Z",
+    "trace_id": "trc_50f24dd7df6f4859872b79500c3d0265",
+    "logical_tx_id": "ltx_c1febe9603a54acea042a690d3de3f26",
+    "slot": 427828765,
+    "event": {
+      "type": "commitment_reached",
+      "commitment": "finalized",
+      "slot": 427828765
     }
   }
 ]

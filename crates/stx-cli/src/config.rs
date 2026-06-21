@@ -64,7 +64,11 @@ impl EngineConfig {
             // compute; a tight limit keeps the priority fee tiny.
             cu_limit: 10_000,
             cu_price_micro: 1_000,
-            max_attempts: 4,
+            max_attempts: std::env::var("STX_MAX_ATTEMPTS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .filter(|&n| n >= 1)
+                .unwrap_or(4),
             anthropic_key: std::env::var("ANTHROPIC_API_KEY").ok(),
         })
     }
