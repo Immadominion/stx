@@ -78,6 +78,26 @@ enum Command {
         #[arg(long)]
         use_agent: bool,
     },
+    /// Race the naive baseline against the full stx engine on the same
+    /// transaction, same instant, same floor snapshot. Prints the comparison and
+    /// writes both traces (for the dashboard side-by-side).
+    Race {
+        /// Confirmation timeout in seconds, per attempt, applied to both lanes.
+        #[arg(long, default_value_t = 30)]
+        timeout: u64,
+        /// Let the AI agent drive the stx lane's retries.
+        #[arg(long)]
+        use_agent: bool,
+        /// Path to the keypair file.
+        #[arg(long, default_value = "wallet.json")]
+        keypair: String,
+        /// Where to write the naive lane's trace (JSON).
+        #[arg(long, default_value = "runs/race-naive.json")]
+        out_naive: String,
+        /// Where to write the stx lane's trace (JSON).
+        #[arg(long, default_value = "runs/race-stx.json")]
+        out_stx: String,
+    },
 }
 
 #[derive(ValueEnum, Clone, Copy)]
@@ -260,6 +280,7 @@ async fn main() -> Result<()> {
                     tip_account,
                     confirm_timeout_secs: timeout,
                     use_agent,
+                    floor_override: None,
                 },
             )
             .await?;
@@ -288,6 +309,45 @@ async fn main() -> Result<()> {
 
             // The lifecycle log (a bounty deliverable) to stdout as JSON.
             println!("{}", serde_json::to_string_pretty(outcome.store.events())?);
+        }
+        Command::Race {
+            timeout,
+            use_agent,
+            keypair,
+            out_naive,
+            out_stx,
+        } => {
+            let cfg = config::EngineConfig::load(&keypair)?;
+            eprintln!("payer: {}", cfg.payer_pubkey());
+            eprintln!("racing naive baseline vs stx (same floor, same instant)...\n");
+            let (naive, smart) = engine::run_race(&cfg, &http, timeout, use_agent).await?;
+            let (n_tip, n_ttl) = engine::race_metrics(&naive);
+            let (s_tip, s_ttl) = engine::race_metrics(&smart);
+            let fmt_ttl = |t: Option<u64>| {
+                t.map(|ms| format!("{:.1}s", ms as f64 / 1000.0))
+                    .unwrap_or_else(|| "-".to_string())
+            };
+            let opt = |o: Option<u64>| o.map(|v| v.to_string()).unwrap_or_else(|| "-".to_string());
+            let row = |label: &str, a: String, b: String| eprintln!("{label:<22}{a:<18}{b}");
+            eprintln!("================= RACE RESULT =================");
+            row("", "naive".to_string(), "stx".to_string());
+            row("landed", naive.landed.to_string(), smart.landed.to_string());
+            row("attempts", naive.attempts.to_string(), smart.attempts.to_string());
+            row("final tip (lamports)", n_tip.to_string(), s_tip.to_string());
+            row("time to land", fmt_ttl(n_ttl), fmt_ttl(s_ttl));
+            row("landed slot", opt(naive.slot), opt(smart.slot));
+            eprintln!("==============================================");
+
+            std::fs::create_dir_all("runs").ok();
+            std::fs::write(&out_naive, serde_json::to_string_pretty(naive.store.events())?)?;
+            std::fs::write(&out_stx, serde_json::to_string_pretty(smart.store.events())?)?;
+            if !smart.decision_records.is_empty() {
+                std::fs::write(
+                    "runs/race-stx-decisions.json",
+                    serde_json::to_string_pretty(&smart.decision_records)?,
+                )?;
+            }
+            eprintln!("traces written: {out_naive}  {out_stx}");
         }
     }
 

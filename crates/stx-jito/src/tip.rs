@@ -96,16 +96,16 @@ pub enum Congestion {
 }
 
 /// Infer network pressure from the tip-floor shape alone: a current p50 that has
-/// spiked to twice its EMA means the floor is climbing fast (contention); a p50
-/// at half its EMA means it is cooling. Deliberately conservative - it only flags
-/// `High` on a clear 2x spike, so it rarely overpays - and needs no extra RPC.
+/// spiked to twice its EMA means the floor is climbing fast (contention) and
+/// warrants p95. Otherwise it is `Normal`, where the EMA-smoothed baseline (the
+/// max of p50 and its EMA) sizes the tip - that already protects against a
+/// momentary p50 dip, so there is deliberately no auto-`Low` branch that would
+/// under-tip when the EMA sits above a dipped p50. Conservative and needs no RPC.
 pub fn detect_congestion(floor: &TipFloor) -> Congestion {
     let p50 = floor.p50.0;
     let ema = floor.ema_p50.0.max(1);
     if p50 >= ema.saturating_mul(2) {
         Congestion::High
-    } else if p50.saturating_mul(2) <= ema {
-        Congestion::Low
     } else {
         Congestion::Normal
     }
@@ -181,8 +181,11 @@ mod tests {
 
     #[test]
     fn congestion_detection_from_floor_shape() {
+        // A p50 at 2x the EMA is a clear spike -> High.
         assert_eq!(detect_congestion(&floor_with(40_000, 20_000)), Congestion::High);
-        assert_eq!(detect_congestion(&floor_with(10_000, 20_000)), Congestion::Low);
+        // A p50 below its EMA is NOT treated as Low (that would under-tip); the
+        // EMA-smoothed Normal baseline handles it.
+        assert_eq!(detect_congestion(&floor_with(10_000, 20_000)), Congestion::Normal);
         assert_eq!(detect_congestion(&floor_with(22_000, 20_000)), Congestion::Normal);
     }
 

@@ -17,8 +17,9 @@ fn backoff(attempt: u32) -> Duration {
 }
 
 /// POST a JSON body with a per-request timeout, retrying on transient failures
-/// (connect/timeout errors, HTTP 429, and 5xx) with exponential backoff. Returns
-/// the response body once a non-retryable outcome is reached.
+/// (connect/timeout errors and 5xx) with exponential backoff. A 429 is surfaced,
+/// not retried, so the caller backs off rather than deepening a rate-limit
+/// back-off. Returns the response body once a non-retryable outcome is reached.
 pub(crate) async fn post_json_with_retry<B: serde::Serialize>(
     http: &reqwest::Client,
     url: &str,
@@ -36,7 +37,11 @@ pub(crate) async fn post_json_with_retry<B: serde::Serialize>(
         {
             Ok(resp) => {
                 let status = resp.status();
-                if (status.as_u16() == 429 || status.is_server_error()) && attempt < MAX_TRIES {
+                // 5xx is genuinely transient; retry with backoff. A 429 is a
+                // rate-limit signal: retrying within the same call only deepens
+                // the server's back-off (Jito's limit is 1 req/s/region), so
+                // surface it and let the caller space out the next attempt.
+                if status.is_server_error() && attempt < MAX_TRIES {
                     tokio::time::sleep(backoff(attempt)).await;
                     continue;
                 }

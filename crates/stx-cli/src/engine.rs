@@ -42,6 +42,9 @@ pub struct SubmitOptions {
     pub confirm_timeout_secs: u64,
     /// Let the AI agent own the retry decision (else the deterministic fallback).
     pub use_agent: bool,
+    /// Use this tip-floor snapshot instead of fetching one. Set by the Race so
+    /// both lanes size their tip off the exact same floor (a fair comparison).
+    pub floor_override: Option<TipFloor>,
 }
 
 pub struct SubmitOutcome {
@@ -56,6 +59,19 @@ pub struct SubmitOutcome {
     /// AI decision records, when `--use-agent` drove a retry.
     pub decision_records: Vec<DecisionRecord>,
 }
+
+/// The 8 Jito mainnet tip accounts. A fallback when `getTipAccounts` is briefly
+/// unavailable; the live fetch is still preferred.
+const FALLBACK_TIP_ACCOUNTS: [&str; 8] = [
+    "96gYZGLnJYVFmbjzopPSU6QiEV5fGqZNyN9nmNhvrZU5",
+    "HFqU5x63VTqvQss8hp11i4wVV8bD44PvwucfZ2bU7gRe",
+    "Cw8CFyM9FkoMi7K7Crf6HNQqf4uEMzpKw6QNghXLvLkY",
+    "ADaUMid9yfUytqMBgopwjb2DTLSokTSzL1zt6iGPaS49",
+    "DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh",
+    "ADuUkR4vqLUMWXxW9gh6D6L8pMSawimctcNZ5pGwDcEt",
+    "DttWaMuVvTiduZRnguLF7jNxTgiMBZ1hyAumKUiL2KRL",
+    "3AVi9Tg9Uo68tJfuvoKvqKNWKkC5wPdSSdeBnizKZ6jT",
+];
 
 /// Conservative static floor if the live tip-floor fetch fails.
 fn default_floor() -> TipFloor {
@@ -309,15 +325,23 @@ pub async fn submit_and_track(
     let tip_accounts: Vec<Pubkey> = match &opts.tip_account {
         Some(s) => vec![Pubkey::from_str(s).map_err(|e| anyhow!("invalid tip account: {e}"))?],
         None => {
-            let accounts = jito.get_tip_accounts().await?;
-            let parsed: Vec<Pubkey> = accounts
+            // Prefer the live fetch, but fall back to the known accounts so a
+            // transient getTipAccounts failure (e.g. a 429) never kills a submit.
+            let fetched: Vec<Pubkey> = jito
+                .get_tip_accounts()
+                .await
+                .unwrap_or_default()
                 .iter()
                 .filter_map(|s| Pubkey::from_str(s).ok())
                 .collect();
-            if parsed.is_empty() {
-                return Err(anyhow!("no valid tip accounts returned"));
+            if fetched.is_empty() {
+                FALLBACK_TIP_ACCOUNTS
+                    .iter()
+                    .filter_map(|s| Pubkey::from_str(s).ok())
+                    .collect()
+            } else {
+                fetched
             }
-            parsed
         }
     };
 
@@ -333,7 +357,10 @@ pub async fn submit_and_track(
         },
     );
 
-    let floor = tip_client.fetch().await.ok().unwrap_or_else(default_floor);
+    let floor = match &opts.floor_override {
+        Some(f) => f.clone(),
+        None => tip_client.fetch().await.ok().unwrap_or_else(default_floor),
+    };
     let mut tip = recommend_tip(&floor, detect_congestion(&floor));
     // Never start above the spend ceiling (escalations past it abort below).
     if tip.0 > cfg.max_tip_lamports {
@@ -667,4 +694,283 @@ pub async fn submit_and_track(
         store,
         decision_records,
     })
+}
+
+/// A deliberately naive baseline submitter for the side-by-side Race. It does
+/// what an unspecialized submit loop does: a fixed median (p50) tip, the single
+/// global auto-routing endpoint, and a blind retry at the SAME tip on failure -
+/// no diagnosis, no escalation, no multi-region fan-out, no spend ceiling. It
+/// confirms landings the same rigorous way as the smart lane, so the ONLY
+/// variable between the lanes is the submission strategy. `floor` is shared with
+/// the smart lane so both size their tip off the same live snapshot.
+pub async fn submit_naive(
+    cfg: &EngineConfig,
+    http: &reqwest::Client,
+    floor: &TipFloor,
+    timeout_secs: u64,
+) -> Result<SubmitOutcome> {
+    let rpc = SolanaRpc::new(http.clone(), cfg.rpc_url.clone());
+    // Naive: the global auto-routing endpoint, the default most reach for.
+    let jito = JitoClient::new(http.clone(), stx_jito::MAINNET_GLOBAL);
+    // Naive: a fixed median tip - no EMA, no congestion, no escalation.
+    let tip = Lamports(floor.p50.0.max(1_000));
+    // Naive: the first tip account, never rotated. Falls back to a well-known
+    // tip account if the fetch fails, so a transient error does not crash the
+    // lane (the Race must always produce a comparison).
+    let tip_account = {
+        let chosen = jito
+            .get_tip_accounts()
+            .await
+            .ok()
+            .and_then(|a| a.into_iter().next())
+            .unwrap_or_else(|| FALLBACK_TIP_ACCOUNTS[0].to_string());
+        Pubkey::from_str(&chosen).map_err(|e| anyhow!("invalid tip account: {e}"))?
+    };
+    let cu_limit = cfg.cu_limit;
+    let payer = cfg.payer_pubkey();
+    let land_timeout = Duration::from_secs(timeout_secs);
+    let finalize_timeout = Duration::from_secs(25);
+
+    let mut store = EventStore::new();
+    let trace_id = TraceId::generate();
+    let ltx = LogicalTxId::generate();
+    store.append(
+        trace_id.clone(),
+        ltx.clone(),
+        None,
+        LifecycleEvent::Drafted {
+            logical_tx_id: ltx.clone(),
+        },
+    );
+
+    let mut landed = false;
+    let mut signature: Option<String> = None;
+    let mut slot_out: Option<u64> = None;
+    let mut leader_out: Option<String> = None;
+    let mut attempt = 0u32;
+
+    while attempt < cfg.max_attempts {
+        attempt += 1;
+        let bh = rpc.get_latest_blockhash(Commitment::Confirmed).await?;
+        let blockhash =
+            Hash::from_str(&bh.blockhash).map_err(|e| anyhow!("invalid blockhash: {e}"))?;
+        store.append(
+            trace_id.clone(),
+            ltx.clone(),
+            None,
+            LifecycleEvent::TipDecided {
+                tip_lamports: tip,
+                source: TipSource::StaticPolicy,
+            },
+        );
+        let built = build_bundle(BundleParams {
+            payer: &cfg.keypair,
+            recent_blockhash: blockhash,
+            tip_account,
+            tip_lamports: tip.0,
+            cu_limit,
+            cu_price_micro_lamports: cfg.cu_price_micro,
+            extra_instructions: vec![],
+        })?;
+        let sig = built.signatures[0].as_str().to_string();
+        signature = Some(sig.clone());
+        store.append(
+            trace_id.clone(),
+            ltx.clone(),
+            None,
+            LifecycleEvent::Built {
+                signatures: built.signatures.clone(),
+            },
+        );
+
+        let (mut hit_rx, stream_handle) = spawn_signature_stream(
+            cfg.yellowstone_endpoint.as_deref(),
+            cfg.yellowstone_x_token.clone(),
+            &payer,
+            &sig,
+        );
+        // Naive: a single endpoint, no fan-out. A send failure is itself a
+        // fragility of the single-endpoint approach; treat it as a dropped
+        // attempt rather than crashing the lane.
+        let bundle_id = match jito.send_bundle(&built.transactions).await {
+            Ok(id) => id,
+            Err(e) => {
+                stream_handle.abort();
+                eprintln!("[naive] attempt {attempt} send failed: {e}");
+                store.append(
+                    trace_id.clone(),
+                    ltx.clone(),
+                    None,
+                    LifecycleEvent::Failed {
+                        class: FailureClass::new(
+                            FailureKind::BundleFailed,
+                            "naive single-endpoint send failed",
+                            0.0,
+                        ),
+                    },
+                );
+                if attempt < cfg.max_attempts {
+                    store.append(
+                        trace_id.clone(),
+                        ltx.clone(),
+                        None,
+                        LifecycleEvent::RetryScheduled {
+                            child_trace: TraceId::generate(),
+                            attempt: attempt + 1,
+                        },
+                    );
+                }
+                continue;
+            }
+        };
+        store.append(
+            trace_id.clone(),
+            ltx.clone(),
+            None,
+            LifecycleEvent::Dispatched {
+                bundle_id: bundle_id.clone(),
+                regions: vec!["global".to_string()],
+            },
+        );
+        store.append(trace_id.clone(), ltx.clone(), None, LifecycleEvent::MarkedInflight);
+        eprintln!(
+            "[naive] attempt {attempt}: bundle={} sig={} tip={} (fixed p50, global, no escalation)",
+            bundle_id.as_str(),
+            sig,
+            tip.0
+        );
+
+        let landing = track_commitments(
+            &mut hit_rx,
+            &rpc,
+            &sig,
+            &mut store,
+            &trace_id,
+            &ltx,
+            land_timeout,
+            finalize_timeout,
+        )
+        .await;
+        stream_handle.abort();
+
+        if let Some((slot, false)) = landing {
+            let leader = rpc
+                .get_slot_leaders(slot, 1)
+                .await
+                .ok()
+                .and_then(|v| v.into_iter().next());
+            eprintln!("[naive] LANDED slot={slot}");
+            landed = true;
+            slot_out = Some(slot);
+            leader_out = leader;
+            break;
+        }
+
+        // Naive: no diagnosis. Record a generic drop and blindly retry the SAME
+        // tip with a fresh blockhash (the unspecialized reflex).
+        store.append(
+            trace_id.clone(),
+            ltx.clone(),
+            None,
+            LifecycleEvent::Failed {
+                class: FailureClass::new(
+                    FailureKind::Dropped,
+                    "naive baseline: no diagnosis, blind retry at the same tip",
+                    0.0,
+                ),
+            },
+        );
+        eprintln!("[naive] attempt {attempt} not confirmed; blind retry at the same tip");
+        if attempt < cfg.max_attempts {
+            store.append(
+                trace_id.clone(),
+                ltx.clone(),
+                None,
+                LifecycleEvent::RetryScheduled {
+                    child_trace: TraceId::generate(),
+                    attempt: attempt + 1,
+                },
+            );
+        }
+    }
+
+    if !landed {
+        store.append(
+            trace_id.clone(),
+            ltx.clone(),
+            None,
+            LifecycleEvent::Aborted {
+                reason: "naive: exhausted blind retries without escalating".to_string(),
+            },
+        );
+    }
+
+    Ok(SubmitOutcome {
+        landed,
+        signature,
+        slot: slot_out,
+        leader: leader_out,
+        attempts: attempt,
+        trace_id,
+        store,
+        decision_records: vec![],
+    })
+}
+
+/// Run the naive baseline and the full stx engine against the same live floor
+/// snapshot, back to back. Both lanes size their tip off the same floor, so the
+/// outcome gap is attributable to the strategy, not to a different floor. They
+/// run sequentially (not concurrently) on purpose: Jito's 1 req/s/region limit
+/// means two lanes hammering the same endpoints would starve each other and
+/// distort the result. The network is stable over the short gap between them.
+pub async fn run_race(
+    cfg: &EngineConfig,
+    http: &reqwest::Client,
+    timeout_secs: u64,
+    use_agent: bool,
+) -> Result<(SubmitOutcome, SubmitOutcome)> {
+    let floor = TipFloorClient::new(http.clone())
+        .fetch()
+        .await
+        .unwrap_or_else(|_| default_floor());
+    let smart_opts = SubmitOptions {
+        dry_run: false,
+        tip_account: None,
+        confirm_timeout_secs: timeout_secs,
+        use_agent,
+        floor_override: Some(floor.clone()),
+    };
+    eprintln!("--- lane 1: naive baseline ---");
+    let naive = submit_naive(cfg, http, &floor, timeout_secs).await?;
+    eprintln!("--- lane 2: stx engine ---");
+    let smart = submit_and_track(cfg, http, &smart_opts).await?;
+    Ok((naive, smart))
+}
+
+/// Headline race metrics pulled from an outcome's trace: the final tip paid (or
+/// last attempted) in lamports, and the wall-clock milliseconds from first
+/// dispatch to landing (`None` if it never landed).
+pub fn race_metrics(outcome: &SubmitOutcome) -> (u64, Option<u64>) {
+    let events = outcome.store.events_for_trace(&outcome.trace_id);
+    let final_tip = events
+        .iter()
+        .rev()
+        .find_map(|e| match &e.event {
+            LifecycleEvent::TipDecided { tip_lamports, .. } => Some(tip_lamports.0),
+            _ => None,
+        })
+        .unwrap_or(0);
+    let first_dispatch = events
+        .iter()
+        .find(|e| matches!(e.event, LifecycleEvent::Dispatched { .. }))
+        .map(|e| e.at);
+    let landed_at = events
+        .iter()
+        .find(|e| matches!(e.event, LifecycleEvent::Landed { .. }))
+        .map(|e| e.at);
+    let ttl = match (first_dispatch, landed_at) {
+        (Some(a), Some(b)) => Some((b - a).num_milliseconds().max(0) as u64),
+        _ => None,
+    };
+    (final_tip, ttl)
 }
