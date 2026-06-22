@@ -26,8 +26,8 @@ The deterministic core works fully with the AI switched off. The agent is a qual
 
 ## See it run
 
-- **Dashboard:** [stx-alpha.vercel.app](https://stx-alpha.vercel.app) shows real mainnet runs as lifecycle timelines, span waterfalls, and the agent's decisions.
-- **A real landing:** slot `424863529`, four attempts, tip escalated to land. [View on Solscan](https://solscan.io/tx/2qkVdddLBRUgG4bBJeA8HCzTpASC46rHjuYxLw59UJvZtuvXagDiR1awzsiFVqZ3YTCWtJfgYGYTErFWaHpQXLsF).
+- **The proof it is smart:** the same transfer, fired the naive way (fixed median tip, single endpoint, blind retry) and the stx way (smart tip, multi-region, diagnose and escalate), against the same live floor. Across six head-to-head races under a contested floor, **the naive strategy landed 0/6 and stx landed 6/6, every one finalized on-chain.** Same floor, same moment, only the strategy differs. Run it yourself with `stx race`; the raw traces are in [docs/evidence/races](docs/evidence/races).
+- **Dashboard:** [stx-alpha.vercel.app](https://stx-alpha.vercel.app) leads with that race, then shows real mainnet runs as lifecycle timelines, span waterfalls, and the agent's decisions.
 - **The raw logs** behind the dashboard live in [docs/evidence](docs/evidence).
 
 ---

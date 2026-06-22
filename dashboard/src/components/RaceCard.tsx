@@ -97,7 +97,21 @@ export function RaceCard({ naive, stx }: { naive: Trace; stx: Trace }) {
         outcome gap is the engineering, not luck.
       </p>
 
-      <div className="mt-5 flex flex-col gap-4 md:flex-row">
+      <div className="mt-4 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-card border border-border bg-canvas px-4 py-3 text-sm">
+        <span className="text-ink-2">Across 6 races under a contested floor:</span>
+        <span>
+          <span className="text-ink-2">naive landed </span>
+          <span className="font-mono font-semibold text-st-failed-ink">0/6</span>
+        </span>
+        <span>
+          <span className="text-ink-2">stx landed </span>
+          <span className="font-mono font-semibold text-st-finalized-ink">6/6</span>
+          <span className="text-ink-3"> (all finalized on-chain)</span>
+        </span>
+      </div>
+
+      <p className="mt-5 text-xs font-medium text-ink-3">One race in detail:</p>
+      <div className="mt-2 flex flex-col gap-4 md:flex-row">
         <Lane
           title="Naive baseline"
           subtitle="fixed median tip · single global endpoint · blind retry"
