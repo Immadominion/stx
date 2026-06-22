@@ -8,6 +8,8 @@ import agentDecisions from "./agent-live-decisions.json";
 import faultBlockhash from "./agent-blockhash-expiry.json";
 import faultFee from "./agent-fee-starvation.json";
 import faultCompute from "./agent-compute-exhaustion.json";
+import raceNaive from "./race-naive.json";
+import raceStx from "./race-stx.json";
 
 import { buildTrace, funnel, type Trace } from "../lib/trace";
 import type { DecisionRecord, Event } from "../lib/types";
@@ -28,3 +30,9 @@ export const faultInjections: DecisionRecord[] = [
   faultFee as unknown as DecisionRecord,
   faultCompute as unknown as DecisionRecord,
 ];
+
+// The Race: the naive baseline vs the full stx engine, same floor, same moment.
+export const race = {
+  naive: buildTrace(raceNaive as unknown as Event[], []),
+  stx: buildTrace(raceStx as unknown as Event[], []),
+};

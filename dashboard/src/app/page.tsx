@@ -1,6 +1,7 @@
-import { faultInjections, overallFunnel, traces } from "@/data";
+import { faultInjections, overallFunnel, race, traces } from "@/data";
 import type { Funnel } from "@/lib/trace";
 import { DecisionCard } from "@/components/DecisionCard";
+import { RaceCard } from "@/components/RaceCard";
 import { TraceCard } from "@/components/TraceCard";
 import { ExtLink } from "@/components/ui";
 
@@ -13,6 +14,8 @@ export default function Home() {
       <SiteHeader />
       <main className="mx-auto max-w-3xl space-y-14 px-6 py-12">
         <Intro funnel={overallFunnel} />
+
+        <RaceCard naive={race.naive} stx={race.stx} />
 
         <section className="space-y-5">
           <SectionHead

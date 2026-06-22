@@ -1,0 +1,228 @@
+[
+  {
+    "seq": 0,
+    "at": "2026-06-22T06:39:40.803134Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "drafted",
+      "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d"
+    }
+  },
+  {
+    "seq": 1,
+    "at": "2026-06-22T06:39:41.246405Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "tip_decided",
+      "tip_lamports": 1024,
+      "source": "static_policy"
+    }
+  },
+  {
+    "seq": 2,
+    "at": "2026-06-22T06:39:41.247831Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "built",
+      "signatures": [
+        "4bzVxUkuVKy66xwxJ9sDHZxVawCFhQ9EYKaVz43UBDVTCcfAQtg2qVgDs6g7e3jNj4ooc1bmZAo1jWaAiCTYDDXy"
+      ]
+    }
+  },
+  {
+    "seq": 3,
+    "at": "2026-06-22T06:39:41.392078Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "failed",
+      "class": {
+        "kind": "bundle_failed",
+        "evidence": "naive single-endpoint send failed",
+        "confidence": 0.0,
+        "raw_error": null,
+        "at_slot": null
+      }
+    }
+  },
+  {
+    "seq": 4,
+    "at": "2026-06-22T06:39:41.392091Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "retry_scheduled",
+      "child_trace": "trc_9b42597ed9f04a5cb08df52e892605bc",
+      "attempt": 2
+    }
+  },
+  {
+    "seq": 5,
+    "at": "2026-06-22T06:39:41.538717Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "tip_decided",
+      "tip_lamports": 1024,
+      "source": "static_policy"
+    }
+  },
+  {
+    "seq": 6,
+    "at": "2026-06-22T06:39:41.538962Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "built",
+      "signatures": [
+        "3SRjjR3678YgQm7FRqxMkVkVnNCZ6PAS7YXMWt6BJfcrkUJXZ35vmkdgKY65VqNPBWceLWpb4NhwVHDmb1aNhGMy"
+      ]
+    }
+  },
+  {
+    "seq": 7,
+    "at": "2026-06-22T06:39:41.678341Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "failed",
+      "class": {
+        "kind": "bundle_failed",
+        "evidence": "naive single-endpoint send failed",
+        "confidence": 0.0,
+        "raw_error": null,
+        "at_slot": null
+      }
+    }
+  },
+  {
+    "seq": 8,
+    "at": "2026-06-22T06:39:41.678349Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "retry_scheduled",
+      "child_trace": "trc_36ca2467362f45eb8ce799450a4e4f4c",
+      "attempt": 3
+    }
+  },
+  {
+    "seq": 9,
+    "at": "2026-06-22T06:39:41.827456Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "tip_decided",
+      "tip_lamports": 1024,
+      "source": "static_policy"
+    }
+  },
+  {
+    "seq": 10,
+    "at": "2026-06-22T06:39:41.827727Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "built",
+      "signatures": [
+        "3SRjjR3678YgQm7FRqxMkVkVnNCZ6PAS7YXMWt6BJfcrkUJXZ35vmkdgKY65VqNPBWceLWpb4NhwVHDmb1aNhGMy"
+      ]
+    }
+  },
+  {
+    "seq": 11,
+    "at": "2026-06-22T06:39:41.984420Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "failed",
+      "class": {
+        "kind": "bundle_failed",
+        "evidence": "naive single-endpoint send failed",
+        "confidence": 0.0,
+        "raw_error": null,
+        "at_slot": null
+      }
+    }
+  },
+  {
+    "seq": 12,
+    "at": "2026-06-22T06:39:41.984436Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "retry_scheduled",
+      "child_trace": "trc_fabb1c64166e4e4aabd42042412aac83",
+      "attempt": 4
+    }
+  },
+  {
+    "seq": 13,
+    "at": "2026-06-22T06:39:42.128691Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "tip_decided",
+      "tip_lamports": 1024,
+      "source": "static_policy"
+    }
+  },
+  {
+    "seq": 14,
+    "at": "2026-06-22T06:39:42.128961Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "built",
+      "signatures": [
+        "2KoXNvkq15qGEYdDHDjyFQC9E3rPqCHcLY3BsX6RgBoSCk6MQL86wkXW2no5ZiKT4qQc7yhKeHNQXEbRumPoaBDU"
+      ]
+    }
+  },
+  {
+    "seq": 15,
+    "at": "2026-06-22T06:39:42.286042Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "failed",
+      "class": {
+        "kind": "bundle_failed",
+        "evidence": "naive single-endpoint send failed",
+        "confidence": 0.0,
+        "raw_error": null,
+        "at_slot": null
+      }
+    }
+  },
+  {
+    "seq": 16,
+    "at": "2026-06-22T06:39:42.286053Z",
+    "trace_id": "trc_1059cf8448eb4ff0b20e1539b94ac4a7",
+    "logical_tx_id": "ltx_42fe30f4dd9749e7a3a5ce8ce5bbe39d",
+    "slot": null,
+    "event": {
+      "type": "aborted",
+      "reason": "naive: exhausted blind retries without escalating"
+    }
+  }
+]
