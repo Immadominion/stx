@@ -303,15 +303,21 @@ pub async fn submit_and_track(
     let jito = JitoClient::new(http.clone(), cfg.jito_base_url.clone());
     let tip_client = TipFloorClient::new(http.clone());
 
-    let tip_account = match &opts.tip_account {
-        Some(s) => Pubkey::from_str(s).map_err(|e| anyhow!("invalid tip account: {e}"))?,
+    // The candidate tip accounts. Jito best practice is to rotate across them
+    // per bundle (spreads write-lock contention); the live selection happens
+    // inside the loop, keyed off each attempt's fresh blockhash.
+    let tip_accounts: Vec<Pubkey> = match &opts.tip_account {
+        Some(s) => vec![Pubkey::from_str(s).map_err(|e| anyhow!("invalid tip account: {e}"))?],
         None => {
             let accounts = jito.get_tip_accounts().await?;
-            let first = accounts
-                .into_iter()
-                .next()
-                .ok_or_else(|| anyhow!("no tip accounts returned"))?;
-            Pubkey::from_str(&first).map_err(|e| anyhow!("invalid tip account: {e}"))?
+            let parsed: Vec<Pubkey> = accounts
+                .iter()
+                .filter_map(|s| Pubkey::from_str(s).ok())
+                .collect();
+            if parsed.is_empty() {
+                return Err(anyhow!("no valid tip accounts returned"));
+            }
+            parsed
         }
     };
 
@@ -379,6 +385,10 @@ pub async fn submit_and_track(
 
         let bh = rpc.get_latest_blockhash(Commitment::Confirmed).await?;
         let blockhash = Hash::from_str(&bh.blockhash).map_err(|e| anyhow!("invalid blockhash: {e}"))?;
+        // Rotate the tip account per bundle (Jito best practice). The fresh
+        // blockhash is the entropy source, so the choice varies per attempt and
+        // per run without pulling in an RNG dependency.
+        let tip_account = tip_accounts[blockhash.to_bytes()[0] as usize % tip_accounts.len()];
 
         store.append(
             trace_id.clone(),
@@ -415,10 +425,11 @@ pub async fn submit_and_track(
                 .simulate_transaction(&built.transactions[0], Commitment::Confirmed)
                 .await?;
             eprintln!(
-                "[dry-run] attempt {attempt}: payer={} sig={} tip={} sim_ok={} cu_consumed={:?} err={}",
+                "[dry-run] attempt {attempt}: payer={} sig={} tip={} tip_account={} sim_ok={} cu_consumed={:?} err={}",
                 cfg.keypair.pubkey(),
                 sig,
                 tip.0,
+                tip_account,
                 sim.succeeded(),
                 sim.units_consumed,
                 sim.err
