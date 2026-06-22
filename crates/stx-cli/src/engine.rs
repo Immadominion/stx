@@ -270,6 +270,7 @@ async fn agent_decide(
         run.decision.clone(),
         &GuardrailPolicy {
             max_attempts: cfg.max_attempts,
+            max_tip: Lamports(cfg.max_tip_lamports),
             ..GuardrailPolicy::default()
         },
         &ValidationContext {
@@ -328,6 +329,10 @@ pub async fn submit_and_track(
 
     let floor = tip_client.fetch().await.ok().unwrap_or_else(default_floor);
     let mut tip = recommend_tip(&floor, Congestion::Normal);
+    // Never start above the spend ceiling (escalations past it abort below).
+    if tip.0 > cfg.max_tip_lamports {
+        tip = Lamports(cfg.max_tip_lamports);
+    }
     let mut cu_limit = cfg.cu_limit;
 
     let mut landed = false;
@@ -564,6 +569,28 @@ pub async fn submit_and_track(
                 },
             );
             eprintln!("aborting: {}", remedy.justification);
+            break;
+        }
+        // Spend-safety ceiling: refuse to overpay. Tips are only charged on a
+        // landing, so capping the tip we will submit hard-bounds the cost of the
+        // run. If even the escalated tip exceeds the ceiling, abort rather than
+        // land at any price (or pointlessly retry at a clamped tip).
+        if remedy.params.tip_lamports.0 > cfg.max_tip_lamports {
+            store.append(
+                trace_id.clone(),
+                ltx.clone(),
+                None,
+                LifecycleEvent::Aborted {
+                    reason: format!(
+                        "tip ceiling reached: next tip {} exceeds max {} lamports",
+                        remedy.params.tip_lamports.0, cfg.max_tip_lamports
+                    ),
+                },
+            );
+            eprintln!(
+                "aborting: required tip {} exceeds ceiling {} lamports (refusing to overpay)",
+                remedy.params.tip_lamports.0, cfg.max_tip_lamports
+            );
             break;
         }
         tip = remedy.params.tip_lamports;

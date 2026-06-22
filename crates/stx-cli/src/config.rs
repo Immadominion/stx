@@ -19,6 +19,9 @@ pub struct EngineConfig {
     pub cu_limit: u32,
     pub cu_price_micro: u64,
     pub max_attempts: u32,
+    /// Hard ceiling on the Jito tip (lamports). The retry loop aborts rather
+    /// than submitting a tip above this, bounding the cost of any single run.
+    pub max_tip_lamports: u64,
     pub anthropic_key: Option<String>,
 }
 
@@ -69,6 +72,13 @@ impl EngineConfig {
                 .and_then(|s| s.parse().ok())
                 .filter(|&n| n >= 1)
                 .unwrap_or(4),
+            // Spend-safety ceiling: the retry loop refuses to submit a tip above
+            // this (it aborts rather than overpaying or landing at any price).
+            // Tips are only paid on landing, so this hard-bounds cost per run.
+            max_tip_lamports: std::env::var("STX_MAX_TIP_LAMPORTS")
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(10_000_000),
             anthropic_key: std::env::var("ANTHROPIC_API_KEY").ok(),
         })
     }

@@ -15,9 +15,9 @@ Sending a transaction on Solana is the easy part. Getting it to land, knowing wh
 It runs on mainnet today. It:
 
 - **Streams the network live** over Yellowstone gRPC (slots, leader windows, and the signatures it cares about).
-- **Submits Jito bundles** with tips computed from live tip-floor percentiles. No hardcoded tip values.
+- **Submits Jito bundles** with tips computed from live tip-floor percentiles (no hardcoded values), fanned out to all 7 Jito regions concurrently for resilience.
 - **Confirms landings from validator ground truth** (the Yellowstone stream), cross-checked against RPC. Not polling alone.
-- **Classifies failures** from real error and bundle-status data, then **retries automatically**, escalating the tip or refreshing the blockhash as the cause demands.
+- **Classifies failures** from real error and bundle-status data, then **retries automatically**, escalating the tip or refreshing the blockhash as the cause demands, up to a spend ceiling it refuses to overpay past (it aborts instead of landing at any price).
 - **Lets an AI agent own one real decision**: on a failure, diagnose the cause and choose the remedy. Its reasoning is recorded and auditable, and a deterministic guardrail bounds every choice.
 
 The deterministic core works fully with the AI switched off. The agent is a quality upgrade at one decision point, never a dependency for the system to run.
