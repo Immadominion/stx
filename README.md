@@ -34,13 +34,13 @@ The deterministic core works fully with the AI switched off. The agent is a qual
 
 ## Status
 
-Six Rust crates, **66 tests passing** (`cargo test --workspace`), plus a Next.js dashboard. The full submit-and-track loop is verified live on mainnet.
+Six Rust crates, **70 tests passing** (`cargo test --workspace`), plus a Next.js dashboard. The full submit-and-track loop is verified live on mainnet.
 
 | Crate | Responsibility | Tests |
 | --- | --- | --- |
 | `stx-core` | Lifecycle FSM, commitment ladder, failure taxonomy, span and funnel projections, event store, deterministic fallback policy | 23 |
-| `stx-jito` | Live tip-floor engine, bundle builder, Jito Block Engine client with multi-region fan-out, Solana RPC client, failure classifier | 24 |
-| `stx-ingestor` | Yellowstone gRPC: slot and signature streams, observation normalizer, ping keep-alive, auto-reconnect | 5 |
+| `stx-jito` | Live tip-floor engine (EMA-smoothed, congestion-aware), bundle builder, Jito Block Engine client with multi-region fan-out, Solana RPC client (leader schedule, balance), failure classifier | 27 |
+| `stx-ingestor` | Yellowstone gRPC: slot and signature streams, observation normalizer, ping keep-alive, auto-reconnect | 6 |
 | `stx-agent` | AI tool-use reasoning loop, guardrail validator, auditable decision records, fault injection | 14 |
 | `stx-cli` | The `stx` binary: submit orchestrator, agent-steered retry loop, live tip data, stream viewer | live |
 

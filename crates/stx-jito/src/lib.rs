@@ -32,6 +32,6 @@ pub use solrpc::{
     SignatureStatusValue, SimulationValue, SolanaRpc,
 };
 pub use tip::{
-    parse_tip_floor, recommend_tip, Congestion, TipFloorClient, DEFAULT_TIP_FLOOR_URL,
-    MIN_TIP_LAMPORTS,
+    detect_congestion, parse_tip_floor, recommend_tip, Congestion, TipFloorClient,
+    DEFAULT_TIP_FLOOR_URL, MIN_TIP_LAMPORTS,
 };

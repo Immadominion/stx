@@ -32,7 +32,7 @@ use stx_core::{
 };
 use stx_ingestor::{run as ingestor_run, account_tx_request, IngestorConfig, Observation};
 use stx_jito::{
-    build_bundle, classify, recommend_tip, submit_to_regions, BundleParams, Congestion,
+    build_bundle, classify, detect_congestion, recommend_tip, submit_to_regions, BundleParams,
     FailureSignals, JitoClient, SolanaRpc, TipFloorClient,
 };
 
@@ -328,7 +328,7 @@ pub async fn submit_and_track(
     );
 
     let floor = tip_client.fetch().await.ok().unwrap_or_else(default_floor);
-    let mut tip = recommend_tip(&floor, Congestion::Normal);
+    let mut tip = recommend_tip(&floor, detect_congestion(&floor));
     // Never start above the spend ceiling (escalations past it abort below).
     if tip.0 > cfg.max_tip_lamports {
         tip = Lamports(cfg.max_tip_lamports);

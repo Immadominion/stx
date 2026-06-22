@@ -95,19 +95,35 @@ pub enum Congestion {
     High,
 }
 
+/// Infer network pressure from the tip-floor shape alone: a current p50 that has
+/// spiked to twice its EMA means the floor is climbing fast (contention); a p50
+/// at half its EMA means it is cooling. Deliberately conservative - it only flags
+/// `High` on a clear 2x spike, so it rarely overpays - and needs no extra RPC.
+pub fn detect_congestion(floor: &TipFloor) -> Congestion {
+    let p50 = floor.p50.0;
+    let ema = floor.ema_p50.0.max(1);
+    if p50 >= ema.saturating_mul(2) {
+        Congestion::High
+    } else if p50.saturating_mul(2) <= ema {
+        Congestion::Low
+    } else {
+        Congestion::Normal
+    }
+}
+
 /// The deterministic fallback tip policy (runs when the AI is disabled).
 /// Picks a percentile by congestion and enforces the 1000-lamport floor.
 /// This is intentionally simple and *documented as the baseline* - it is never
 /// presented as "intelligence"; the agent is measured against it.
 pub fn recommend_tip(floor: &TipFloor, congestion: Congestion) -> Lamports {
-    let percentile = match congestion {
-        Congestion::Low => TipPercentile::P25,
-        Congestion::Normal => TipPercentile::P50,
-        Congestion::High => TipPercentile::P95,
+    let tip = match congestion {
+        Congestion::Low => floor.percentile(TipPercentile::P25),
+        // Smoothed baseline: the higher of the current p50 and its EMA, so a
+        // momentary dip in the noisy raw p50 does not cause an under-tip.
+        Congestion::Normal => Lamports(floor.p50.0.max(floor.ema_p50.0)),
+        Congestion::High => floor.percentile(TipPercentile::P95),
     };
-    floor
-        .percentile(percentile)
-        .clamp_to(MIN_TIP_LAMPORTS, Lamports(u64::MAX))
+    tip.clamp_to(MIN_TIP_LAMPORTS, Lamports(u64::MAX))
 }
 
 #[cfg(test)]
@@ -137,9 +153,37 @@ mod tests {
     #[test]
     fn fallback_policy_picks_percentile() {
         let floor = parse_tip_floor(LIVE_BODY).unwrap();
+        // p50 (30000) >= ema_p50 (22697), so the Normal baseline is p50.
         assert_eq!(recommend_tip(&floor, Congestion::Normal), floor.p50);
         assert_eq!(recommend_tip(&floor, Congestion::High), floor.p95);
         assert_eq!(recommend_tip(&floor, Congestion::Low), floor.p25);
+    }
+
+    fn floor_with(p50: u64, ema: u64) -> TipFloor {
+        TipFloor {
+            at: Utc::now(),
+            p25: Lamports(1_000),
+            p50: Lamports(p50),
+            p75: Lamports(20_000),
+            p95: Lamports(80_000),
+            p99: Lamports(200_000),
+            ema_p50: Lamports(ema),
+        }
+    }
+
+    #[test]
+    fn normal_baseline_holds_at_ema_when_p50_dips() {
+        // A momentary p50 dip below the EMA: the baseline holds at the EMA
+        // rather than chasing the noisy low value down into an under-tip.
+        let floor = floor_with(5_000, 12_000);
+        assert_eq!(recommend_tip(&floor, Congestion::Normal), Lamports(12_000));
+    }
+
+    #[test]
+    fn congestion_detection_from_floor_shape() {
+        assert_eq!(detect_congestion(&floor_with(40_000, 20_000)), Congestion::High);
+        assert_eq!(detect_congestion(&floor_with(10_000, 20_000)), Congestion::Low);
+        assert_eq!(detect_congestion(&floor_with(22_000, 20_000)), Congestion::Normal);
     }
 
     #[test]
