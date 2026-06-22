@@ -166,6 +166,14 @@ impl SolanaRpc {
         .await
     }
 
+    /// `getBalance` - the lamport balance of `pubkey` at `confirmed`.
+    pub async fn get_balance(&self, pubkey: &str) -> Result<u64, JitoError> {
+        let cv: Ctx<u64> = self
+            .call("getBalance", json!([pubkey, { "commitment": "confirmed" }]))
+            .await?;
+        Ok(cv.value)
+    }
+
     /// `simulateTransaction` - replaces the blockhash so a stale one doesn't
     /// reject the sim; `sigVerify` must then be false.
     pub async fn simulate_transaction(

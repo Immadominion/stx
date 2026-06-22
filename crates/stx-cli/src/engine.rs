@@ -335,6 +335,17 @@ pub async fn submit_and_track(
     }
     let mut cu_limit = cfg.cu_limit;
 
+    // Headroom over the tip for the base fee + priority fee.
+    const FEE_BUFFER_LAMPORTS: u64 = 10_000;
+    // Pre-flight balance. A tip is only charged on landing, but submitting a
+    // bundle we cannot fund just burns attempts. Fetch once (the balance only
+    // moves when a tx lands, at which point we stop). A failed fetch never
+    // blocks submission.
+    let balance = rpc
+        .get_balance(&cfg.payer_pubkey())
+        .await
+        .unwrap_or(u64::MAX);
+
     let mut landed = false;
     let mut signature: Option<String> = None;
     let mut slot_out: Option<u64> = None;
@@ -345,6 +356,26 @@ pub async fn submit_and_track(
 
     while attempt < cfg.max_attempts {
         attempt += 1;
+
+        // Affordability guard: never submit a bundle we cannot fund.
+        if tip.0.saturating_add(FEE_BUFFER_LAMPORTS) > balance {
+            store.append(
+                trace_id.clone(),
+                ltx.clone(),
+                None,
+                LifecycleEvent::Aborted {
+                    reason: format!(
+                        "insufficient balance: {balance} lamports cannot cover tip {} + fees",
+                        tip.0
+                    ),
+                },
+            );
+            eprintln!(
+                "aborting: insufficient balance ({balance} lamports) for tip {} + fees",
+                tip.0
+            );
+            break;
+        }
 
         let bh = rpc.get_latest_blockhash(Commitment::Confirmed).await?;
         let blockhash = Hash::from_str(&bh.blockhash).map_err(|e| anyhow!("invalid blockhash: {e}"))?;
