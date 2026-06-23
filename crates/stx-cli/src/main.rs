@@ -9,10 +9,7 @@
 //! credentials are wired; the deterministic pieces it composes are already built
 //! and tested in the library crates.
 
-mod agent_tools;
-mod config;
-mod diagnose;
-mod engine;
+use stx_cli::{config, diagnose, engine};
 
 use anyhow::{anyhow, Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};

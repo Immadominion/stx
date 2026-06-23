@@ -974,3 +974,147 @@ pub fn race_metrics(outcome: &SubmitOutcome) -> (u64, Option<u64>) {
     };
     (final_tip, ttl)
 }
+
+/// Relay an externally-signed transaction (base64) through the smart pipeline:
+/// fan it out to every Jito region and track its lifecycle from the validator
+/// stream. stx holds no signing authority over the caller's transaction, so
+/// there is no AI-retry; the value is multi-region resilience and a full, honest
+/// lifecycle trace. The caller's transaction pays its own way (it must carry a
+/// Jito tip to be processed as a bundle); stx spends nothing of its own.
+pub async fn submit_external(
+    cfg: &EngineConfig,
+    http: &reqwest::Client,
+    tx_base64: &str,
+) -> Result<SubmitOutcome> {
+    use base64::Engine as _;
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(tx_base64.trim())
+        .map_err(|e| anyhow!("transaction is not valid base64: {e}"))?;
+    let tx: solana_sdk::transaction::VersionedTransaction =
+        bincode::deserialize(&bytes).map_err(|e| anyhow!("could not decode transaction: {e}"))?;
+    let sig = tx
+        .signatures
+        .first()
+        .ok_or_else(|| anyhow!("transaction is not signed"))?
+        .to_string();
+    let payer = tx
+        .message
+        .static_account_keys()
+        .first()
+        .ok_or_else(|| anyhow!("transaction has no accounts"))?
+        .to_string();
+
+    let rpc = SolanaRpc::new(http.clone(), cfg.rpc_url.clone());
+    let mut store = EventStore::new();
+    let trace_id = TraceId::generate();
+    let ltx = LogicalTxId::generate();
+    store.append(
+        trace_id.clone(),
+        ltx.clone(),
+        None,
+        LifecycleEvent::Drafted {
+            logical_tx_id: ltx.clone(),
+        },
+    );
+
+    // Open the signature subscription before submitting.
+    let (mut hit_rx, stream_handle) = spawn_signature_stream(
+        cfg.yellowstone_endpoint.as_deref(),
+        cfg.yellowstone_x_token.clone(),
+        &payer,
+        &sig,
+    );
+
+    // Fan the caller's transaction out to every region.
+    let region_refs: Vec<&str> = cfg.jito_regions.iter().map(|s| s.as_str()).collect();
+    let results = submit_to_regions(http, &region_refs, &[tx_base64.trim().to_string()]).await;
+    let accepted: Vec<String> = results
+        .iter()
+        .filter(|(_, r)| r.is_ok())
+        .map(|(url, _)| region_label(url))
+        .collect();
+
+    if accepted.is_empty() {
+        stream_handle.abort();
+        store.append(
+            trace_id.clone(),
+            ltx.clone(),
+            None,
+            LifecycleEvent::Aborted {
+                reason: "every region rejected the transaction (does it carry a Jito tip?)".to_string(),
+            },
+        );
+        return Ok(SubmitOutcome {
+            landed: false,
+            signature: Some(sig),
+            slot: None,
+            leader: None,
+            attempts: 1,
+            trace_id,
+            store,
+            decision_records: vec![],
+        });
+    }
+
+    let bundle_id = results
+        .into_iter()
+        .find_map(|(_, r)| r.ok())
+        .expect("accepted is non-empty");
+    store.append(
+        trace_id.clone(),
+        ltx.clone(),
+        None,
+        LifecycleEvent::Dispatched {
+            bundle_id,
+            regions: accepted,
+        },
+    );
+    store.append(trace_id.clone(), ltx.clone(), None, LifecycleEvent::MarkedInflight);
+
+    let landing = track_commitments(
+        &mut hit_rx,
+        &rpc,
+        &sig,
+        &mut store,
+        &trace_id,
+        &ltx,
+        Duration::from_secs(30),
+        Duration::from_secs(25),
+    )
+    .await;
+    stream_handle.abort();
+
+    let (landed, slot_out, leader_out) = match landing {
+        Some((slot, false)) => {
+            let leader = rpc
+                .get_slot_leaders(slot, 1)
+                .await
+                .ok()
+                .and_then(|v| v.into_iter().next());
+            (true, Some(slot), leader)
+        }
+        Some((slot, true)) => (false, Some(slot), None),
+        None => {
+            store.append(
+                trace_id.clone(),
+                ltx.clone(),
+                None,
+                LifecycleEvent::Aborted {
+                    reason: "not confirmed within timeout".to_string(),
+                },
+            );
+            (false, None, None)
+        }
+    };
+
+    Ok(SubmitOutcome {
+        landed,
+        signature: Some(sig),
+        slot: slot_out,
+        leader: leader_out,
+        attempts: 1,
+        trace_id,
+        store,
+        decision_records: vec![],
+    })
+}

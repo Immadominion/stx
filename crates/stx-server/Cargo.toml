@@ -1,28 +1,26 @@
 [package]
-name = "stx-cli"
+name = "stx-server"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-description = "stx CLI: live tip data, the AI fault-injection demo, and (with credentials) live bundle submission."
+description = "HTTP service exposing the stx engine: transaction autopsy, smart relay, and the race, behind a small JSON API."
 
 [[bin]]
-name = "stx"
+name = "stx-server"
 path = "src/main.rs"
 
 [dependencies]
 stx-core = { path = "../stx-core" }
 stx-jito = { path = "../stx-jito" }
 stx-agent = { path = "../stx-agent" }
-stx-ingestor = { path = "../stx-ingestor" }
-serde = { workspace = true, features = ["derive"] }
-serde_json.workspace = true
-chrono.workspace = true
-clap = { version = "4", features = ["derive"] }
+stx-cli = { path = "../stx-cli" }
+axum = "0.7"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
 tokio = { version = "1", features = ["full"] }
 reqwest = { version = "0.12", default-features = false, features = ["json", "gzip", "rustls-tls"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
 anyhow = "1"
 dotenvy = "0.15"
-solana-sdk = "4.0.1"
-async-trait = "0.1"
-base64 = "0.22"
-bincode = "1"
+tracing = "0.1"
+tracing-subscriber = "0.3"

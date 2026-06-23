@@ -6,6 +6,7 @@ members = [
     "crates/stx-ingestor",
     "crates/stx-agent",
     "crates/stx-cli",
+    "crates/stx-server",
 ]
 
 [workspace.package]
