@@ -28,13 +28,25 @@ pub struct EngineConfig {
 impl EngineConfig {
     /// Load from `.env.local` (RPC + optional gRPC + Anthropic key) and a keypair.
     pub fn load(keypair_path: &str) -> Result<Self> {
+        let keypair = read_keypair_file(keypair_path)
+            .map_err(|e| anyhow!("failed to read keypair {keypair_path}: {e}"))?;
+        Self::load_with_keypair(keypair)
+    }
+
+    /// Relay-only config: no real keypair needed. The relay path
+    /// (`submit_external`) never signs - it forwards an already-signed
+    /// transaction - so an ephemeral throwaway key satisfies the struct without
+    /// shipping or reading a funded wallet. Used by the server's `/api/submit`.
+    pub fn load_relay() -> Result<Self> {
+        Self::load_with_keypair(Keypair::new())
+    }
+
+    fn load_with_keypair(keypair: Keypair) -> Result<Self> {
         let _ = dotenvy::from_filename(".env.local");
         let rpc_url = std::env::var("SOLINFRA_RPC_URL")
             .or_else(|_| std::env::var("HELIUS_RPC_ENDPOINT"))
             .or_else(|_| std::env::var("RPC_URL"))
             .map_err(|_| anyhow!("set SOLINFRA_RPC_URL or HELIUS_RPC_ENDPOINT in .env.local"))?;
-        let keypair = read_keypair_file(keypair_path)
-            .map_err(|e| anyhow!("failed to read keypair {keypair_path}: {e}"))?;
         Ok(Self {
             rpc_url,
             // A regional endpoint keeps submit + status queries on the same

@@ -31,8 +31,6 @@ struct AppState {
     /// History-capable RPC (for the autopsy).
     rpc_url: String,
     anthropic_key: Option<String>,
-    /// Keypair path for the relay/submit path (optional).
-    keypair_path: String,
 }
 
 #[tokio::main]
@@ -45,7 +43,6 @@ async fn main() {
         .or_else(|_| std::env::var("RPC_URL"))
         .expect("set HELIUS_RPC_ENDPOINT (or SOLINFRA_RPC_URL / RPC_URL)");
     let anthropic_key = std::env::var("ANTHROPIC_API_KEY").ok();
-    let keypair_path = std::env::var("STX_KEYPAIR").unwrap_or_else(|_| "wallet.json".to_string());
 
     let http = reqwest::Client::builder()
         .connect_timeout(Duration::from_secs(8))
@@ -57,7 +54,6 @@ async fn main() {
         http,
         rpc_url,
         anthropic_key,
-        keypair_path,
     });
 
     let app = Router::new()
@@ -149,7 +145,7 @@ async fn submit_handler(
     State(s): State<Arc<AppState>>,
     Json(req): Json<SubmitRequest>,
 ) -> Result<Json<SubmitResponse>, (StatusCode, String)> {
-    let cfg = EngineConfig::load(&s.keypair_path)
+    let cfg = EngineConfig::load_relay()
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, format!("config: {e}")))?;
     let outcome = engine::submit_external(&cfg, &s.http, &req.transaction)
         .await

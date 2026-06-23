@@ -1,7 +1,9 @@
 # stx-server: build the engine HTTP service and run it in a slim image.
 FROM rust:1-slim-bookworm AS builder
+# build-essential provides cc/gcc, needed by ring, blake3, and zstd-sys build
+# scripts (the rustls+ring graph; no openssl-sys, so no libssl-dev needed).
 RUN apt-get update \
- && apt-get install -y --no-install-recommends pkg-config libssl-dev \
+ && apt-get install -y --no-install-recommends build-essential \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY . .
