@@ -1,0 +1,12 @@
+target
+**/target
+.git
+dashboard
+docs
+runs
+*.md
+wallet.json
+.env.local
+.vercel
+node_modules
+**/node_modules
