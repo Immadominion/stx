@@ -98,6 +98,36 @@ impl SignatureStatusValue {
     }
 }
 
+/// Execution metadata from a landed transaction (`getTransaction` -> `meta`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct TxMeta {
+    /// The execution error, if the transaction failed on-chain (`null` if it
+    /// succeeded). Kept as raw JSON so the classifier sees the exact shape.
+    pub err: Option<Value>,
+    #[serde(default)]
+    pub fee: u64,
+    #[serde(default, rename = "computeUnitsConsumed")]
+    pub compute_units_consumed: Option<u64>,
+    #[serde(default, rename = "logMessages")]
+    pub log_messages: Option<Vec<String>>,
+}
+
+/// A landed transaction as returned by `getTransaction`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct TransactionInfo {
+    pub slot: u64,
+    #[serde(rename = "blockTime")]
+    pub block_time: Option<i64>,
+    pub meta: Option<TxMeta>,
+}
+
+impl TransactionInfo {
+    /// Whether the transaction executed without error.
+    pub fn succeeded(&self) -> bool {
+        self.meta.as_ref().map(|m| m.err.is_none()).unwrap_or(true)
+    }
+}
+
 /// A thin Solana JSON-RPC client.
 #[derive(Clone)]
 pub struct SolanaRpc {
@@ -131,6 +161,30 @@ impl SolanaRpc {
         parsed
             .result
             .ok_or_else(|| JitoError::Invalid("jsonrpc response had no result".into()))
+    }
+
+    /// Like [`call`], but a `null` result is a valid `None` (not an error) -
+    /// for methods like `getTransaction` where "not found" is expressed as null.
+    async fn call_opt<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: Value,
+    ) -> Result<Option<T>, JitoError> {
+        let req = Req {
+            jsonrpc: "2.0",
+            id: 1,
+            method,
+            params,
+        };
+        let text = crate::net::post_json_with_retry(&self.http, &self.url, &req).await?;
+        let parsed: Resp<T> = serde_json::from_str(&text)?;
+        if let Some(e) = parsed.error {
+            return Err(JitoError::Rpc {
+                code: e.code,
+                message: e.message,
+            });
+        }
+        Ok(parsed.result)
     }
 
     /// `getLatestBlockhash` - fetch at `confirmed` for time-sensitive sends.
@@ -174,6 +228,27 @@ impl SolanaRpc {
         Ok(cv.value)
     }
 
+    /// `getTransaction` - the landed transaction's slot, fee, compute, error, and
+    /// logs. Returns `None` if the signature is not found on-chain (dropped, or
+    /// never landed). Used by the transaction autopsy.
+    pub async fn get_transaction(
+        &self,
+        signature: &str,
+    ) -> Result<Option<TransactionInfo>, JitoError> {
+        self.call_opt(
+            "getTransaction",
+            json!([
+                signature,
+                {
+                    "encoding": "json",
+                    "maxSupportedTransactionVersion": 0,
+                    "commitment": "confirmed"
+                }
+            ]),
+        )
+        .await
+    }
+
     /// `simulateTransaction` - replaces the blockhash so a stale one doesn't
     /// reject the sim; `sigVerify` must then be false.
     pub async fn simulate_transaction(
@@ -203,16 +278,19 @@ impl SolanaRpc {
             .await
     }
 
-    /// `getSignatureStatuses` - authoritative on-chain landing check. Entries
-    /// are `null` for signatures not found.
+    /// `getSignatureStatuses` - authoritative on-chain landing check. Entries are
+    /// `null` for signatures not found. `search_history` searches the longer
+    /// transaction history (needed for older signatures, e.g. the autopsy); the
+    /// submit hot path leaves it off, since it only checks fresh signatures.
     pub async fn get_signature_statuses(
         &self,
         signatures: &[String],
+        search_history: bool,
     ) -> Result<Vec<Option<SignatureStatusValue>>, JitoError> {
         let cv: Ctx<Vec<Option<SignatureStatusValue>>> = self
             .call(
                 "getSignatureStatuses",
-                json!([signatures, { "searchTransactionHistory": false }]),
+                json!([signatures, { "searchTransactionHistory": search_history }]),
             )
             .await?;
         Ok(cv.value)

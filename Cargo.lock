@@ -3370,6 +3370,7 @@ dependencies = [
  "clap",
  "dotenvy",
  "reqwest",
+ "serde",
  "serde_json",
  "solana-sdk",
  "stx-agent",

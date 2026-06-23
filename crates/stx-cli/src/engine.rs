@@ -186,7 +186,7 @@ async fn track_commitments(
                 None => stream_open = false,
             },
             _ = rpc_tick.tick() => {
-                if let Ok(statuses) = rpc.get_signature_statuses(&sigs).await {
+                if let Ok(statuses) = rpc.get_signature_statuses(&sigs, false).await {
                     if let Some(Some(st)) = statuses.first() {
                         landed = Some((st.slot, !st.succeeded()));
                         eprintln!("  processed: slot {} (rpc)", st.slot);
@@ -206,7 +206,7 @@ async fn track_commitments(
     let phase2 = tokio::time::Instant::now();
     while phase2.elapsed() < finalize_timeout {
         tokio::time::sleep(Duration::from_millis(500)).await;
-        let Ok(statuses) = rpc.get_signature_statuses(&sigs).await else {
+        let Ok(statuses) = rpc.get_signature_statuses(&sigs, false).await else {
             continue;
         };
         let Some(Some(st)) = statuses.first() else {

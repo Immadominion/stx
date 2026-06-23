@@ -11,6 +11,7 @@
 
 mod agent_tools;
 mod config;
+mod diagnose;
 mod engine;
 
 use anyhow::{anyhow, Context, Result};
@@ -97,6 +98,13 @@ enum Command {
         /// Where to write the stx lane's trace (JSON).
         #[arg(long, default_value = "runs/race-stx.json")]
         out_stx: String,
+    },
+    /// Autopsy any transaction: fetch what happened on-chain, classify it, and
+    /// have the AI explain why it landed or died and what to change. Read-only,
+    /// works on any signature (not just stx's own).
+    Diagnose {
+        /// The transaction signature to diagnose.
+        signature: String,
     },
 }
 
@@ -348,6 +356,32 @@ async fn main() -> Result<()> {
                 )?;
             }
             eprintln!("traces written: {out_naive}  {out_stx}");
+        }
+        Command::Diagnose { signature } => {
+            let _ = dotenvy::from_filename(".env.local");
+            // The autopsy needs full transaction history, so prefer a
+            // history-capable RPC (Helius); some providers (e.g. Solinfra) return
+            // null for getTransaction on older signatures.
+            let rpc_url = std::env::var("HELIUS_RPC_ENDPOINT")
+                .or_else(|_| std::env::var("SOLINFRA_RPC_URL"))
+                .or_else(|_| std::env::var("RPC_URL"))
+                .map_err(|_| anyhow!("set HELIUS_RPC_ENDPOINT or SOLINFRA_RPC_URL in .env.local"))?;
+            let rpc = SolanaRpc::new(http.clone(), rpc_url);
+            let anthropic = std::env::var("ANTHROPIC_API_KEY")
+                .ok()
+                .map(|k| AnthropicClient::new(http.clone(), k));
+            let d = diagnose::diagnose(&rpc, anthropic.as_ref(), &signature).await?;
+            eprintln!("=== TRANSACTION AUTOPSY ===");
+            eprintln!("{}", d.headline);
+            eprintln!();
+            for f in &d.facts {
+                eprintln!("  - {f}");
+            }
+            if let Some(e) = &d.explanation {
+                eprintln!("\ndiagnosis:\n  {e}");
+            }
+            // Structured result to stdout.
+            println!("{}", serde_json::to_string_pretty(&d)?);
         }
     }
 

@@ -14,6 +14,7 @@ stx-core = { path = "../stx-core" }
 stx-jito = { path = "../stx-jito" }
 stx-agent = { path = "../stx-agent" }
 stx-ingestor = { path = "../stx-ingestor" }
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 chrono.workspace = true
 clap = { version = "4", features = ["derive"] }

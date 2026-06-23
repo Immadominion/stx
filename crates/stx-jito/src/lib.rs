@@ -29,7 +29,7 @@ pub use rpc::{
 };
 pub use solrpc::{
     blockhash_expired, leader_windows, LatestBlockhash, LeaderWindow, PrioritizationFee,
-    SignatureStatusValue, SimulationValue, SolanaRpc,
+    SignatureStatusValue, SimulationValue, SolanaRpc, TransactionInfo, TxMeta,
 };
 pub use tip::{
     detect_congestion, parse_tip_floor, recommend_tip, Congestion, TipFloorClient,

@@ -198,4 +198,33 @@ impl AnthropicClient {
             return Ok(parsed);
         }
     }
+
+    /// A single-turn, tool-free text completion. Used for plain-language
+    /// explanations (the transaction autopsy) where no tool loop is needed.
+    pub async fn complete(
+        &self,
+        system: &str,
+        user: &str,
+        max_tokens: u32,
+    ) -> Result<String, AgentError> {
+        let req = MessagesRequest {
+            model: DEFAULT_MODEL.to_string(),
+            max_tokens,
+            system: Some(system.to_string()),
+            messages: vec![Message::user(json!([{ "type": "text", "text": user }]))],
+            tools: vec![],
+            tool_choice: None,
+            thinking: None,
+        };
+        let resp = self.create(&req).await?;
+        let text = resp
+            .content
+            .iter()
+            .find_map(|b| match b {
+                ContentBlock::Text { text } => Some(text.clone()),
+                _ => None,
+            })
+            .unwrap_or_default();
+        Ok(text)
+    }
 }
