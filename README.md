@@ -1,8 +1,8 @@
 # stx
 
-**A Solana transaction control tower.** Every transaction is a trace: from submitted to finalized, with the tip and the retry decisions that got it there.
+**A Solana transaction control tower.** Every transaction is a trace: from submitted to finalized, with the tip and the retry decisions that got it there. It also tells you the truth about *any* transaction, not just its own: paste a signature and stx autopsies what happened on-chain and why.
 
-[Live dashboard](https://stx-alpha.vercel.app) · [Architecture](docs/ARCHITECTURE.md) · [A landed bundle on Solscan](https://solscan.io/tx/2qkVdddLBRUgG4bBJeA8HCzTpASC46rHjuYxLw59UJvZtuvXagDiR1awzsiFVqZ3YTCWtJfgYGYTErFWaHpQXLsF)
+[Live dashboard](https://stx-alpha.vercel.app) · [Diagnose a transaction](https://stx-alpha.vercel.app) · [Architecture](docs/ARCHITECTURE.md) · [A landed bundle on Solscan](https://solscan.io/tx/2qkVdddLBRUgG4bBJeA8HCzTpASC46rHjuYxLw59UJvZtuvXagDiR1awzsiFVqZ3YTCWtJfgYGYTErFWaHpQXLsF)
 
 ![stx architecture](docs/diagrams/architecture-diagram.png)
 
@@ -19,30 +19,35 @@ It runs on mainnet today. It:
 - **Confirms landings from validator ground truth** (the Yellowstone stream), cross-checked against RPC. Not polling alone.
 - **Classifies failures** from real error and bundle-status data, then **retries automatically**, escalating the tip or refreshing the blockhash as the cause demands, up to a spend ceiling it refuses to overpay past (it aborts instead of landing at any price).
 - **Lets an AI agent own one real decision**: on a failure, diagnose the cause and choose the remedy. Its reasoning is recorded and auditable, and a deterministic guardrail bounds every choice.
+- **Diagnoses any transaction, not just its own.** Paste a signature into the [live dashboard](https://stx-alpha.vercel.app) and stx fetches what happened on-chain, classifies it with the same failure taxonomy, and the AI explains why it landed or died and what to change. The same engine, pointed at the whole network. This is the "Transaction ER."
 
 The deterministic core works fully with the AI switched off. The agent is a quality upgrade at one decision point, never a dependency for the system to run.
+
+All of this is exposed two ways: a CLI (`stx`) and an HTTP service (`stx-server`, an axum API with `/api/diagnose`, `/api/race`, and `/api/submit`) so the engine is reusable, not a one-off script. The dashboard is its front end.
 
 ---
 
 ## See it run
 
+- **Diagnose a transaction, live:** open [stx-alpha.vercel.app](https://stx-alpha.vercel.app), paste any signature (a failed one of your own works), and get the autopsy: what happened on-chain, the classification, and the AI's plain-language explanation of why and what to change. Or from the CLI: `stx diagnose <signature>`.
 - **The proof it is smart:** the same transfer, fired the naive way (fixed median tip, single endpoint, blind retry) and the stx way (smart tip, multi-region, diagnose and escalate), against the same live floor. Across six head-to-head races under a contested floor, **the naive strategy landed 0/6 and stx landed 6/6, every one finalized on-chain.** Same floor, same moment, only the strategy differs. Run it yourself with `stx race`; the raw traces are in [docs/evidence/races](docs/evidence/races).
-- **Dashboard:** [stx-alpha.vercel.app](https://stx-alpha.vercel.app) leads with that race, then shows real mainnet runs as lifecycle timelines, span waterfalls, and the agent's decisions.
+- **Dashboard:** the live site leads with the race and the Transaction ER, then shows real mainnet runs as lifecycle timelines, span waterfalls, and the agent's decisions.
 - **The raw logs** behind the dashboard live in [docs/evidence](docs/evidence).
 
 ---
 
 ## Status
 
-Six Rust crates, **70 tests passing** (`cargo test --workspace`), plus a Next.js dashboard. The full submit-and-track loop is verified live on mainnet.
+Seven Rust crates, **70 tests passing** (`cargo test --workspace`), plus a Next.js dashboard. The full submit-and-track loop is verified live on mainnet.
 
 | Crate | Responsibility | Tests |
 | --- | --- | --- |
 | `stx-core` | Lifecycle FSM, commitment ladder, failure taxonomy, span and funnel projections, event store, deterministic fallback policy | 23 |
-| `stx-jito` | Live tip-floor engine (EMA-smoothed, congestion-aware), bundle builder, Jito Block Engine client with multi-region fan-out, Solana RPC client (leader schedule, balance), failure classifier | 27 |
+| `stx-jito` | Live tip-floor engine (EMA-smoothed, congestion-aware), bundle builder, Jito Block Engine client with multi-region fan-out, Solana RPC client (leader schedule, balance, transaction lookup), failure classifier | 27 |
 | `stx-ingestor` | Yellowstone gRPC: slot and signature streams, observation normalizer, ping keep-alive, auto-reconnect | 6 |
 | `stx-agent` | AI tool-use reasoning loop, guardrail validator, auditable decision records, fault injection | 14 |
-| `stx-cli` | The `stx` binary: submit orchestrator, agent-steered retry loop, live tip data, stream viewer | live |
+| `stx-cli` | The `stx` binary and engine library: submit orchestrator, agent-steered retry loop, the race, the transaction autopsy, live tip data, stream viewer | live |
+| `stx-server` | axum HTTP service exposing the engine: `/api/diagnose` (autopsy), `/api/race`, `/api/submit` (smart relay). The dashboard's back end; self-hostable | live |
 
 ---
 
