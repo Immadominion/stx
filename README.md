@@ -2,7 +2,7 @@
 
 **A Solana transaction control tower.** Every transaction is a trace: from submitted to finalized, with the tip and the retry decisions that got it there. It also tells you the truth about *any* transaction, not just its own: paste a signature and stx autopsies what happened on-chain and why.
 
-[Live dashboard](https://stx-alpha.vercel.app) · [Diagnose a transaction](https://stx-alpha.vercel.app) · [Architecture](docs/ARCHITECTURE.md) · [A landed bundle on Solscan](https://solscan.io/tx/2qkVdddLBRUgG4bBJeA8HCzTpASC46rHjuYxLw59UJvZtuvXagDiR1awzsiFVqZ3YTCWtJfgYGYTErFWaHpQXLsF)
+[Live dashboard](https://stx-alpha.vercel.app) · [Architecture doc](https://stx-architecture.vercel.app) · [Live engine API](https://stx-server-production.up.railway.app/api/health) · [A landed bundle on Solscan](https://solscan.io/tx/2qkVdddLBRUgG4bBJeA8HCzTpASC46rHjuYxLw59UJvZtuvXagDiR1awzsiFVqZ3YTCWtJfgYGYTErFWaHpQXLsF)
 
 ![stx architecture](docs/diagrams/architecture-diagram.png)
 

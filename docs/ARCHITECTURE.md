@@ -1,5 +1,7 @@
 # stx - Architecture Design Document
 
+> 📄 **Published, separately-hosted version:** https://stx-architecture.vercel.app (the canonical architecture document for the submission). This in-repo file is the source notes.
+
 > A smart Solana transaction stack that treats every transaction as a **distributed trace**: observed in real time from validator ground truth, submitted intelligently via Jito bundles, tracked across commitment levels as a span waterfall, and steered by an AI operator-copilot that owns one real operational decision - *why a transaction failed and what to change before retrying*.
 >
 > **Working name:** stx (transactions "land" on Solana; a control tower tracks and maximizes landings). Status: design. Target network: **mainnet-beta**. Stack: **Rust core + Next.js dashboard + Claude-powered AI brain**.

@@ -29,3 +29,4 @@ context.txt
 # OS / editor
 .DS_Store
 *.log
+architecture-site/.vercel/

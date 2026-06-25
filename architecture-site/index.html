@@ -1,0 +1,340 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>stx — Architecture</title>
+<meta name="description" content="Architecture of stx: a smart Solana transaction stack that treats every transaction as a distributed trace, submits via Jito, tracks commitment, and lets an AI agent own one real operational decision." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --canvas:#faf8f3; --surface:#f3f0e9; --raised:#fffefb;
+    --ink:#1b1b18; --ink2:#54514a; --ink3:#8b877d;
+    --border:#e4dfd4; --brand:#5f6f3d; --brand-soft:#eef0e4;
+    --green:#3f7a4f; --green-bg:#e8f0e7; --red:#a8442f; --red-bg:#f6e7e2;
+    --amber:#9a6a1e; --amber-bg:#f4ebd9; --blue:#3a5a7a; --blue-bg:#e6edf3;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{
+    margin:0;background:var(--canvas);color:var(--ink);
+    font-family:Inter,system-ui,-apple-system,sans-serif;
+    font-size:16px;line-height:1.65;-webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:820px;margin:0 auto;padding:0 24px}
+  code,pre,.mono{font-family:"JetBrains Mono",ui-monospace,monospace}
+
+  header.top{border-bottom:1px solid var(--border);background:var(--raised)}
+  header.top .wrap{display:flex;align-items:baseline;justify-content:space-between;padding:16px 24px;flex-wrap:wrap;gap:8px}
+  .brand{font-family:"JetBrains Mono",monospace;font-weight:600;font-size:15px}
+  .brand .dot{color:var(--brand)}
+  .toplinks a{color:var(--ink2);text-decoration:none;font-size:13px;margin-left:16px;border-bottom:1px solid transparent}
+  .toplinks a:hover{color:var(--brand);border-color:var(--brand)}
+
+  .hero{padding:64px 0 40px}
+  .eyebrow{font-family:"JetBrains Mono",monospace;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--brand);font-weight:500}
+  h1{font-size:38px;line-height:1.12;letter-spacing:-.02em;margin:14px 0 0;font-weight:700}
+  .lede{font-size:19px;color:var(--ink2);margin:18px 0 0;max-width:42em}
+  .meta{margin-top:22px;display:flex;gap:8px;flex-wrap:wrap}
+  .pill{font-size:12px;font-family:"JetBrains Mono",monospace;background:var(--surface);border:1px solid var(--border);border-radius:999px;padding:4px 11px;color:var(--ink2)}
+  .pill.live{background:var(--green-bg);border-color:#cfe0cd;color:var(--green)}
+  .pill.live::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--green);margin-right:6px;vertical-align:1px}
+
+  section{padding:34px 0;border-top:1px solid var(--border)}
+  h2{font-size:14px;font-family:"JetBrains Mono",monospace;letter-spacing:.04em;color:var(--ink3);font-weight:600;margin:0 0 6px;text-transform:uppercase}
+  h2 .n{color:var(--brand);margin-right:8px}
+  h3.title{font-size:25px;letter-spacing:-.015em;margin:0 0 16px;font-weight:650}
+  h4{font-size:16px;margin:24px 0 6px;font-weight:600}
+  p{margin:0 0 14px}
+  a{color:var(--brand)}
+  strong{font-weight:650}
+  .muted{color:var(--ink2)}
+
+  .card{background:var(--raised);border:1px solid var(--border);border-radius:12px;padding:20px 22px;margin:16px 0}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:680px){.grid2{grid-template-columns:1fr}}
+  .surface{padding:18px 20px;border:1px solid var(--border);border-radius:12px;background:var(--raised)}
+  .surface .k{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--brand);font-weight:600}
+  .surface h4{margin:6px 0 6px;font-size:17px}
+  .surface p{font-size:14.5px;color:var(--ink2);margin:0}
+
+  figure{margin:18px 0}
+  figure img{width:100%;border:1px solid var(--border);border-radius:12px;background:#fff;display:block}
+  figcaption{font-size:13px;color:var(--ink3);margin-top:8px;text-align:center}
+
+  pre.ascii{background:var(--raised);border:1px solid var(--border);border-radius:12px;padding:18px;overflow:auto;font-size:12.5px;line-height:1.45;color:var(--ink2)}
+
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14.5px}
+  th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
+  th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--ink3);font-weight:600}
+  td code{font-size:13px;background:var(--surface);padding:1px 5px;border-radius:4px}
+  tr:last-child td{border-bottom:none}
+
+  .callout{border-left:3px solid var(--brand);background:var(--brand-soft);border-radius:0 10px 10px 0;padding:14px 18px;margin:16px 0;font-size:15px}
+  .callout.win{border-color:var(--green);background:var(--green-bg)}
+  .stat{display:flex;gap:26px;flex-wrap:wrap;margin:18px 0}
+  .stat .b{font-size:30px;font-weight:700;letter-spacing:-.02em;line-height:1}
+  .stat .l{font-size:12.5px;color:var(--ink3);margin-top:4px}
+  .stat .good{color:var(--green)} .stat .bad{color:var(--red)}
+
+  ul.tight{margin:8px 0 14px;padding-left:20px}
+  ul.tight li{margin:5px 0}
+  .kicker{font-family:"JetBrains Mono",monospace;font-size:12px;color:var(--ink3)}
+
+  footer{border-top:1px solid var(--border);background:var(--raised);margin-top:20px}
+  footer .wrap{padding:30px 24px;font-size:13.5px;color:var(--ink2)}
+  footer a{margin-right:18px}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <span class="brand">stx<span class="dot">.</span> <span style="color:var(--ink3);font-weight:400">architecture</span></span>
+    <nav class="toplinks">
+      <a href="https://stx-alpha.vercel.app">Dashboard</a>
+      <a href="https://stx-server-production.up.railway.app/api/health">Live API</a>
+      <a href="https://github.com/Immadominion/stx">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow">Architecture Design Document</div>
+    <h1>A transaction is a distributed trace.</h1>
+    <p class="lede">stx is a smart Solana transaction stack. It observes the network from validator ground truth, submits through Jito intelligently, tracks every transaction across commitment levels as a span waterfall, and lets an AI agent own one real operational decision: <em>why a transaction failed and what to change before retrying</em>.</p>
+    <div class="meta">
+      <span class="pill live">live on mainnet</span>
+      <span class="pill">Rust core · 7 crates</span>
+      <span class="pill">Next.js dashboard</span>
+      <span class="pill">Claude Opus agent</span>
+      <span class="pill">70 tests</span>
+    </div>
+  </div>
+
+  <section id="thesis">
+    <h2><span class="n">00</span>The thesis</h2>
+    <h3 class="title">The lifecycle already <em>is</em> a trace — so make it one.</h3>
+    <p>On Solana, "sending a transaction" is the visible tip of a long pipeline: leader scheduling, TPU ingestion, block production, shred propagation, and three commitment stages. That pipeline is <strong>exactly the shape of a distributed-systems request trace</strong>.</p>
+    <p>stx makes the analogy literal. Each transaction is a <strong>trace</strong> (its signature). Each lifecycle stage is a <strong>span</strong> with a real start and end sourced from the Yellowstone validator stream. The latency deltas the problem asks about <em>are</em> span durations. Failure classes are span error tags. A retry is a linked child trace. The result reads like Jaeger or a Stripe payment timeline to any engineer on sight, while staying deep and correct for Solana: commitment handling becomes visible span boundaries, not a <code>console.log</code>.</p>
+    <p class="muted">That reframe is also why stx is more than a sender. It tells you the truth about <em>any</em> transaction.</p>
+  </section>
+
+  <section id="surfaces">
+    <h2><span class="n">01</span>Three surfaces, one engine</h2>
+    <h3 class="title">What you can actually do with it</h3>
+    <div class="grid2">
+      <div class="surface">
+        <div class="k">submit + track</div>
+        <h4>The Control Tower</h4>
+        <p>Build and submit a Jito bundle, fan it to every region, and watch it climb the commitment ladder live — processed, confirmed, finalized — with the tip and retry decisions that got it there.</p>
+      </div>
+      <div class="surface">
+        <div class="k">diagnose</div>
+        <h4>The Transaction ER</h4>
+        <p>Paste <em>any</em> signature. stx fetches what happened on-chain, classifies it with the same failure taxonomy, and the AI explains why it landed or died and what to change. The engine, pointed at the whole network.</p>
+      </div>
+      <div class="surface">
+        <div class="k">prove</div>
+        <h4>The Proving Ground</h4>
+        <p>A head-to-head race: the same transfer, the naive way vs the stx way, same floor, same instant. The only variable is the strategy — so the outcome gap is the engineering.</p>
+      </div>
+      <div class="surface">
+        <div class="k">reuse</div>
+        <h4>The Engine API</h4>
+        <p>All of it behind a small HTTP service (<code>stx-server</code>) deployed with CI — <code>/api/diagnose</code>, <code>/api/race</code>, <code>/api/submit</code>. Not a one-off script; reusable, self-hostable infrastructure.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="principles">
+    <h2><span class="n">02</span>Design principles</h2>
+    <h3 class="title">Seven rules the build is held to</h3>
+    <table>
+      <tr><th>#</th><th>Principle</th><th>What it forces</th></tr>
+      <tr><td>P1</td><td><strong>Ground truth, not polling</strong></td><td>Landing is confirmed from the Yellowstone stream (subscribed <em>before</em> submit so a sub-second landing is never missed), cross-checked against RPC. Polling alone is never trusted.</td></tr>
+      <tr><td>P2</td><td><strong>Policy / mechanism separation</strong></td><td>The deterministic core (stream, build, submit, track, retry) runs fully with the AI disabled. The agent is a brain consulted at named points; its output is validated and bounded before execution.</td></tr>
+      <tr><td>P3</td><td><strong>The AI lives where latency is free</strong></td><td>LLM latency (~1–3 s) far exceeds slot time (400 ms). The agent owns post-failure decisions, never per-slot hot-path timing. That is what makes it defensible rather than theatre.</td></tr>
+      <tr><td>P4</td><td><strong>No hardcoded shortcuts</strong></td><td>Tips come from live Jito percentile data. Failure classes come from real <code>err</code> fields. Retry decisions come from the agent or a documented fallback — never an <code>if error == X</code> switch dressed as intelligence.</td></tr>
+      <tr><td>P5</td><td><strong>Everything is an event</strong></td><td>The core is event-sourced: an append-only log is the source of truth; the FSM state, the dashboard, the lifecycle export, and the span waterfall are all replayable projections of it.</td></tr>
+      <tr><td>P6</td><td><strong>Compiler-checked correctness</strong></td><td>Commitment levels, slot statuses, and the failure taxonomy are exhaustive Rust enums; illegal states are unrepresentable.</td></tr>
+      <tr><td>P7</td><td><strong>Evidence over claims</strong></td><td>Every run emits explorer-verifiable signatures and a structured lifecycle log; every AI decision emits an auditable record.</td></tr>
+    </table>
+  </section>
+
+  <section id="system">
+    <h2><span class="n">03</span>System architecture</h2>
+    <h3 class="title">Five layers; the event store is the spine</h3>
+    <p>Data flows up (observation, from the validator) and down (action, toward Jito). The deterministic core in the middle is the mechanism; the AI brain is policy consulted off the hot path; the dashboard and API are the surface.</p>
+    <figure>
+      <img src="architecture-diagram.png" alt="stx system architecture diagram" loading="lazy" />
+      <figcaption>The five layers and the event-sourced spine.</figcaption>
+    </figure>
+<pre class="ascii">  L1  Solana mainnet + Jito Block Engine + Jito tip-floor        (external)
+        │  gRPC (Yellowstone)              ▲  HTTP (bundles, tips)
+        ▼                                  │
+  L2  CORE TRANSACTION STACK  (Rust · runs fully without the AI)
+        Ingestor ─► Lifecycle FSM ─► Event Store (append-only, source of truth)
+           ▲              ▲                       │ projections
+        Blockhash    Submitter (7-region Jito) ◄─ Bundle builder ◄─ Tip engine
+           │         Failure classifier · Retry orchestrator · Fallback policy
+           └──────────────── decision request (async, off the hot path) ────────┐
+                                                                                 ▼
+  L3  AI BRAIN  (Rust → Claude Opus)  observe→reason→decide · guardrail validator
+  L4  ENGINE API  (Rust · axum · stx-server)  /api/diagnose · /api/race · /api/submit
+  L5  DASHBOARD  (Next.js)  trace waterfall · the race · the Transaction ER</pre>
+  </section>
+
+  <section id="components">
+    <h2><span class="n">04</span>Key components</h2>
+    <h3 class="title">Seven crates, clean separation</h3>
+    <table>
+      <tr><th>Crate</th><th>Responsibility</th></tr>
+      <tr><td><code>stx-core</code></td><td>Domain types, the lifecycle FSM, the event store, the commitment ladder, the failure taxonomy, span &amp; funnel projections, and the deterministic fallback policy. Illegal states unrepresentable.</td></tr>
+      <tr><td><code>stx-ingestor</code></td><td>Yellowstone gRPC: slot and transaction streams, the observation normalizer, ping keep-alive, auto-reconnect with replay. Native-roots TLS, raised decode limit.</td></tr>
+      <tr><td><code>stx-jito</code></td><td>Live tip-floor engine (EMA-smoothed, congestion-aware), the bundle builder, the Jito Block Engine client with multi-region fan-out, the Solana RPC client (blockhash, simulate, leader schedule, balance, transaction lookup), and the failure classifier.</td></tr>
+      <tr><td><code>stx-agent</code></td><td>The AI tool-use reasoning loop (Anthropic Messages API), the guardrail validator, auditable decision records, and the fault-injection harness.</td></tr>
+      <tr><td><code>stx-cli</code></td><td>The <code>stx</code> binary and engine library: the submit-and-track orchestrator, the agent-steered retry loop, the race, the transaction autopsy, live tip data, and the stream viewer.</td></tr>
+      <tr><td><code>stx-server</code></td><td>The axum HTTP service exposing the engine. The dashboard's back end and a self-hostable API. Deployed on Railway with CI.</td></tr>
+      <tr><td><span class="kicker">dashboard</span></td><td>The Next.js "control tower": the race, the Transaction ER, lifecycle timelines, span waterfalls, and the agent's recorded decisions.</td></tr>
+    </table>
+  </section>
+
+  <section id="dataflow">
+    <h2><span class="n">05</span>Data flow</h2>
+    <h3 class="title">Action down, truth up — every step an event</h3>
+    <div class="grid2">
+      <div class="card">
+        <h4 style="margin-top:0">Submission path (action)</h4>
+        <ul class="tight muted">
+          <li>Intent enters the core → <code>Drafted</code></li>
+          <li>Tip engine sizes the tip from the live floor → <code>TipDecided</code> (span <code>tip.decide</code>)</li>
+          <li>Bundle builder assembles + signs → <code>Built</code> (span <code>bundle.build</code>)</li>
+          <li>Submitter fans out to all 7 regions → <code>Dispatched</code> → <code>MarkedInflight</code> (span <code>auction.wait</code>)</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h4 style="margin-top:0">Observation path (truth)</h4>
+        <ul class="tight muted">
+          <li>The signature stream (opened before submit) reports the landing → <code>Landed(slot)</code></li>
+          <li>Fast status polling advances <code>processed → confirmed → finalized</code>; each transition records a real latency delta</li>
+          <li>On failure, the classifier emits a <code>FailureClass</code>; the retry orchestrator consults the agent or fallback; it resubmits a linked child trace or aborts</li>
+        </ul>
+      </div>
+    </div>
+    <p class="muted">Confirmation deliberately does <strong>not</strong> trust Jito's <code>getInflightBundleStatuses</code> for the landing decision: it can report <code>Invalid</code> for a bundle that actually landed, which would false-negative into a dangerous double-submit. The stream plus authoritative RPC is the source of truth.</p>
+  </section>
+
+  <section id="spans">
+    <h2><span class="n">06</span>The trace / span model</h2>
+    <h3 class="title">The abstraction, precisely</h3>
+    <table>
+      <tr><th>Span</th><th>Opens</th><th>Closes</th><th>Duration means</th></tr>
+      <tr><td><code>tip.decide</code></td><td>Drafted</td><td>TipDecided</td><td>policy / agent decision latency</td></tr>
+      <tr><td><code>bundle.build</code></td><td>TipDecided</td><td>Built</td><td>local build + sign time</td></tr>
+      <tr><td><code>auction.wait</code></td><td>Dispatched</td><td>Landed</td><td>dispatch → inclusion (auction + leader window)</td></tr>
+      <tr><td><code>confirm</code></td><td>Landed (processed)</td><td>confirmed</td><td><strong>consensus voting latency — a cluster-health probe</strong></td></tr>
+      <tr><td><code>finalize</code></td><td>confirmed</td><td>finalized</td><td>rooting latency (~32 slots / ~12.8 s structural floor)</td></tr>
+    </table>
+    <p class="muted">Measured live on mainnet, consistently across runs: <strong>processed → confirmed ≈ 0.63–0.66 s</strong>, <strong>confirmed → finalized ≈ 11–12 s</strong>. Each stage is stamped with its real observation time, so the deltas are read straight off the trace, not estimated.</p>
+  </section>
+
+  <section id="infra">
+    <h2><span class="n">07</span>Infrastructure decisions</h2>
+    <h3 class="title">What runs where, and why</h3>
+    <table>
+      <tr><th>Decision</th><th>Choice</th><th>Rationale</th></tr>
+      <tr><td>Core language</td><td><strong>Rust</strong></td><td>First-class <code>yellowstone-grpc</code> + Jito tooling; exhaustive enum matching on commitment/error types; tokio for the concurrent stream/submit fabric; correctness is compiler-checked.</td></tr>
+      <tr><td>Network</td><td><strong>mainnet-beta</strong></td><td>The only network with a real Jito auction, realistic tip data, and explorer-verifiable slots (judges cross-reference). Tip cost is pennies.</td></tr>
+      <tr><td>Streaming + RPC</td><td>SolInfra Yellowstone + Helius RPC</td><td>Config-driven endpoint + x-token. Helius is used for the autopsy's history lookup (SolInfra's RPC returns null for older <code>getTransaction</code> — a real, verified provider quirk).</td></tr>
+      <tr><td>AI</td><td><strong>Claude Opus</strong>, Rust client, manual tool-use loop</td><td>Keeps the brain in-process; fine-grained control for guardrails and decision logging.</td></tr>
+      <tr><td>Engine API</td><td>axum on <strong>Railway</strong>, CI from GitHub</td><td>A persistent host for the gRPC stream + relay; every push to the Rust crates auto-deploys.</td></tr>
+      <tr><td>Dashboard</td><td>Next.js on <strong>Vercel</strong></td><td>The web2-legible surface; the interactive autopsy runs as a serverless route mirroring the engine.</td></tr>
+      <tr><td>Event store</td><td>In-memory append-only log (Postgres-ready)</td><td>Simple, replayable, no external dependency to demo; projections rebuildable.</td></tr>
+    </table>
+  </section>
+
+  <section id="agent">
+    <h2><span class="n">08</span>AI agent responsibilities</h2>
+    <h3 class="title">It owns one decision: why it failed, and what to change</h3>
+    <p>When a submission fails (in production) or a fault is injected (in the demo), the agent diagnoses the <strong>root cause</strong> and chooses a <strong>cause-appropriate remedy</strong> — not a blanket "bump everything and retry."</p>
+    <p><strong>Why this is real reasoning, not a wrapper:</strong> the same surface error has different root causes needing different, sometimes counterintuitive, remedies. A blockhash expiry needs a refresh and <em>no</em> tip change. Fee starvation needs a tip escalation and nothing else. An adverse-market program error means <em>abort</em>, because retrying burns fees. Disambiguating requires combining the error code, CU-consumed-vs-requested, tip-vs-floor, blockhash age, and the retry history — and the agent can test a hypothesis against a live <code>simulateTransaction</code> before committing. A lookup table is wrong precisely when it matters.</p>
+    <div class="card">
+      <h4 style="margin-top:0">The loop</h4>
+      <ul class="tight muted">
+        <li><strong>Read-only tools:</strong> failure context, network conditions, tip floor, retry history, and <code>simulate_with_params</code> (test a fix before committing).</li>
+        <li><strong>One strict commit tool:</strong> <code>commit_decision(action, tip, cu, refresh_blockhash, hypotheses[], chosen_cause, justification, confidence)</code>.</li>
+        <li><strong>Guardrail validator</strong> (deterministic, never trusts the model): clamps the tip into <code>[1000, max]</code>, enforces <code>max_attempts</code>, routes low confidence to the conservative default, and honors a blockhash refresh only if it <em>actually</em> expired — preventing double-submits. Every clamp is logged.</li>
+        <li><strong>DecisionRecord:</strong> one per decision — observed → reasoned → decided → governed → outcome — rendered in the dashboard and exported with the lifecycle log.</li>
+      </ul>
+    </div>
+    <p><strong>Fault-injection demo (the acceptance test):</strong> the harness runs three times, injecting a different failure each time. The agent gathers different evidence, runs a simulation, and commits three different cause-appropriate remedies (raise tip / refresh blockhash / abort). Then the AI is switched off and the core still runs on its documented fallback — clean separation, with a measurably worse landing rate that quantifies the agent's value.</p>
+  </section>
+
+  <section id="failure">
+    <h2><span class="n">09</span>Failure handling strategy</h2>
+    <h3 class="title">A data-derived taxonomy, and the bugs we hit</h3>
+    <table>
+      <tr><th>Class</th><th>Primary signal</th><th>Remedy</th></tr>
+      <tr><td>Expired blockhash</td><td><code>Dropped{BlockhashExpired}</code> / blockheight exceeded / age past 150</td><td>refresh blockhash, resubmit (no tip change)</td></tr>
+      <tr><td>Fee too low</td><td>never lands; tip below the live floor</td><td>escalate the tip toward where landings are happening</td></tr>
+      <tr><td>Compute exceeded</td><td><code>ComputationalBudgetExceeded</code> / CU ≈ limit</td><td>raise the CU limit (not the tip)</td></tr>
+      <tr><td>Bundle failure</td><td>marked Failed/Invalid; simulation failure</td><td>rebuild / resimulate or abort</td></tr>
+      <tr><td>Adverse market</td><td>program custom error (e.g. slippage)</td><td>abort — retrying burns fees</td></tr>
+    </table>
+    <p class="muted">Resilience: per-request timeouts and bounded retries on all I/O; multi-region fan-out (independent rate budgets); a <strong>spend ceiling</strong> that aborts rather than overpaying; and a <strong>pre-flight balance guard</strong> so it never fires a bundle it cannot fund.</p>
+    <div class="callout">
+      <strong>What load-testing actually surfaced.</strong> Building the race as a stress test shook out three real bugs, now fixed: (1) retrying an HTTP 429 within 400 ms <em>amplified</em> Jito's 1 req/s rate limit into a 120-second back-off — a 429 is now surfaced, not retried; (2) a bare <code>signature</code> filter on the Yellowstone transaction stream is silently ignored by the provider — switched to an <code>account_include</code> filter on the fee payer; (3) the congestion detector misread a high EMA as "cooling" and under-tipped. Honest operational understanding comes from breaking your own system.
+    </div>
+  </section>
+
+  <section id="proof">
+    <h2><span class="n">10</span>The proof</h2>
+    <h3 class="title">Is the "smart" part actually smart?</h3>
+    <p>The Race answers it with a controlled experiment: the same transfer, fired the naive way (fixed median tip, single endpoint, blind retry) and the stx way (EMA-smart tip, 7-region fan-out, diagnose-and-escalate), against the <em>same live floor snapshot at the same moment</em>. The only variable is the strategy.</p>
+    <div class="stat">
+      <div><div class="b bad">0/6</div><div class="l">naive landed (contested floor)</div></div>
+      <div><div class="b good">6/6</div><div class="l">stx landed — all finalized on-chain</div></div>
+    </div>
+    <p class="muted">Across six head-to-head races under contention, the naive strategy never won the auction; stx escalated to where landings were happening and landed every time. Under a calm floor both land — the engineering earns its keep exactly when it is hard. Every stx landing slot is explorer-verifiable; the raw traces are committed in the repo.</p>
+    <div class="callout win"><strong>This is the difference between "it works" and "it's smart"</strong> — a number, on the same floor, that a judge can click through to Solscan.</div>
+  </section>
+
+  <section id="questions">
+    <h2><span class="n">11</span>The three questions</h2>
+    <h3 class="title">Answered from the running system</h3>
+    <p><strong>1. What does the processed→confirmed delta tell you about network health?</strong> It is the consensus voting round-trip — a direct read on how fast the cluster is agreeing. Small and steady (we measured ≈0.65 s) is a healthy, fast-voting cluster; large or rising means fork contention, a high skip rate, or vote/replay lag under congestion.</p>
+    <p><strong>2. Why never fetch a blockhash at <code>finalized</code> for a time-sensitive transaction?</strong> A finalized blockhash is already ~32 slots / ~13 s old, so it burns roughly a fifth of the ~150-block (~60–90 s) validity window before you even sign — sharply raising the odds of expiry. <code>getLatestBlockhash</code> defaults to <code>finalized</code>; stx fetches at <code>confirmed</code> (fresh, but on the canonical chain so it won't vanish with a dropped fork).</p>
+    <p><strong>3. What happens to your bundle if the Jito leader skips their slot?</strong> Nothing lands. Bundles are atomic and only processed by a Jito-Solana leader; a skipped slot means no block to land in, no auto-rollover, no retry-for-you. You resubmit against the next Jito leader, with a fresh blockhash if the old one expired and usually a higher tip, since inclusion is a tip auction. stx's retry loop does exactly this.</p>
+  </section>
+
+  <section id="links">
+    <h2><span class="n">12</span>See it for yourself</h2>
+    <h3 class="title">Everything is live and verifiable</h3>
+    <div class="grid2">
+      <div class="surface"><div class="k">dashboard</div><h4><a href="https://stx-alpha.vercel.app">stx-alpha.vercel.app</a></h4><p>The race, the Transaction ER (paste a signature), and real mainnet lifecycle traces.</p></div>
+      <div class="surface"><div class="k">engine api</div><h4><a href="https://stx-server-production.up.railway.app/api/health">stx-server on Railway</a></h4><p><code>/api/diagnose/&lt;sig&gt;</code> · <code>/api/race</code> · <code>/api/submit</code>. The same engine, self-hostable.</p></div>
+      <div class="surface"><div class="k">source</div><h4><a href="https://github.com/Immadominion/stx">github.com/Immadominion/stx</a></h4><p>Seven Rust crates, 70 tests, the Dockerfile, and the raw lifecycle logs.</p></div>
+      <div class="surface"><div class="k">evidence</div><h4><a href="https://github.com/Immadominion/stx/tree/main/docs/evidence">docs/evidence</a></h4><p>The curated 10-run lifecycle log, the six race traces, and the agent's recorded decisions.</p></div>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="wrap">
+    <div style="margin-bottom:10px">
+      <a href="https://stx-alpha.vercel.app">Dashboard</a>
+      <a href="https://stx-server-production.up.railway.app/api/health">Live API</a>
+      <a href="https://github.com/Immadominion/stx">GitHub</a>
+    </div>
+    <span class="muted">stx — a smart Solana transaction stack. Built on mainnet; every claim explorer-verifiable.</span>
+  </div>
+</footer>
+
+</body>
+</html>
