@@ -4,6 +4,13 @@
 
 [Live dashboard](https://stx-alpha.vercel.app) · [Architecture doc](https://stx-architecture.vercel.app) · [Live engine API](https://stx-server-production.up.railway.app/api/health) · [A landed bundle on Solscan](https://solscan.io/tx/2qkVdddLBRUgG4bBJeA8HCzTpASC46rHjuYxLw59UJvZtuvXagDiR1awzsiFVqZ3YTCWtJfgYGYTErFWaHpQXLsF)
 
+## Evaluate it in 60 seconds
+
+1. **Open the [live dashboard](https://stx-alpha.vercel.app).** It leads with the Race: the same transfer sent the naive way (fixed tip, one endpoint, blind retry) vs the stx way (smart tip, 7-region fan-out, diagnose and escalate), against the same live floor at the same moment. Under contention, **naive landed 0/6, stx landed 6/6, all finalized.** Click any slot to verify it on Solscan.
+2. **Paste any transaction signature** into the Transaction ER on that page. stx pulls what happened on-chain, classifies it, and the AI explains why it landed or died and what to change. It works on any recent signature, not just stx's own.
+3. **The three required questions** are answered from real measured runs, below in [The three bounty questions](#the-three-bounty-questions).
+4. **It is all live and verifiable:** the [dashboard](https://stx-alpha.vercel.app), the [architecture document](https://stx-architecture.vercel.app), and the [engine API](https://stx-server-production.up.railway.app/api/health) (`/api/diagnose/<sig>`, `/api/race`). Every claim links to Solscan.
+
 ![stx architecture](docs/diagrams/architecture-diagram.png)
 
 ---
